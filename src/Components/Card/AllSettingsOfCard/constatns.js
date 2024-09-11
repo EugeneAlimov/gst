@@ -1,0 +1,45 @@
+export const userNameArr = [
+  "R",
+  "B",
+  "C",
+  "T",
+  "K",
+  "S",
+  "O",
+  "W",
+  "M",
+  "X",
+  "P",
+  "A",
+  "G",
+  "Z",
+  "Y",
+  "D",
+  "V",
+  "N",
+  "F",
+  "B",
+  "Й",
+  "У",
+];
+
+export const checkListArr = [
+  {
+    id: 1,
+    isChecked: false,
+    text: "",
+    isSelected: false,
+  },
+  // {
+  //   id: 4,
+  //   isChecked: false,
+  //   text: "",
+  //   isSelected: false,
+  // },
+  // {
+  //   id: 5,
+  //   isChecked: false,
+  //   text: "",
+  //   isSelected: false,
+  // },
+];

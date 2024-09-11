@@ -1,0 +1,13 @@
+.LinkItem {
+  color: #fff;
+  text-decoration: none;
+}
+
+.LinkItem:hover {
+  color: #adaaaa;
+}
+
+.LinkItemActive {
+  color: rgb(129, 148, 199);
+  text-decoration: none;
+}
