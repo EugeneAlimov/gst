@@ -12,6 +12,7 @@ import IconButton from "@mui/material/IconButton";
 
 import { useGetUsersQuery } from "../../Redux/user/user-operations";
 import { logOut } from "../../Redux/auth/auth-operations";
+import { setActiveBoardToDefault } from "../../Redux/board/board-slice";
 
 export default function UserNav({ userName }) {
   const dispatch = useDispatch();
@@ -39,6 +40,7 @@ export default function UserNav({ userName }) {
   const handleClose = () => {
     setAnchorElUser(null);
     dispatch(logOut());
+    dispatch(setActiveBoardToDefault())
   };
   
   const avatarSimbol = userName.substring(0, 1).toUpperCase()

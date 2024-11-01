@@ -6,6 +6,7 @@ import CardMedia from "@mui/material/CardMedia";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 
+
 //import application components
 import Header from "./Header";
 import Users from "./Usets";
@@ -21,8 +22,8 @@ import Actions from "./Actions";
 import Description from "./Description";
 import Checklist from "./Checklist";
 
-export default function AllSettingsOfCard({ date_time_finish, date_time_start, status }) {
-
+export default function AllSettingsOfCard({ date_time_finish, date_time_start, status, text, user, column_id, chipsArr }) {
+  
   return (
     <Box sx={Style.mainContainer}>
       <CardMedia
@@ -34,7 +35,7 @@ export default function AllSettingsOfCard({ date_time_finish, date_time_start, s
       />
       <Box>
         <Box sx={{ paddingLeft: "55px", marginBottom: "20px" }}>
-          <Header />
+          <Header text={text} column_id={column_id} />
           <Box
             sx={{
               display: "flex",
@@ -44,8 +45,8 @@ export default function AllSettingsOfCard({ date_time_finish, date_time_start, s
           >
             <Box className="main-action-container-in-the-card" sx={{ marginTop: "25px" }}>
               <Box className="basic-operations-with-card" sx={Style.basicOperationsWithCard}>
-                <Users />
-                <Cheeps />
+                <Users user={user} />
+                <Cheeps chipsArr={chipsArr} />
                 <Actions
                   date_time_finish={date_time_finish}
                   date_time_start={date_time_start}

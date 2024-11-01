@@ -16,9 +16,14 @@ import GreyButtonCreateColumn from "../UI/GreyButtonCreateColumn";
 import { boardData } from "../../Redux/board/board-slice";
 
 // import static
-import { useGetBoardsQuery, useGetActiveBoardMutation } from "../../Redux/board/board-operations";
+import {
+  // useGetBoardsQuery,
+  useGetActiveBoardMutation,
+  useGetUserBoardsQuery,
+} from "../../Redux/board/board-operations";
 import { getActiveBoardId } from "../../Redux/board/board-slice";
 import { useCreateNewColumnMutation } from "../../Redux/columns/column-operations";
+import { columnData } from "../../Redux/columns/column-slice";
 
 const BoardSelect = styled(Select)(() => ({
   fieldset: {
@@ -30,11 +35,12 @@ const BoardSelect = styled(Select)(() => ({
 export default function BoardSelectNav({ isLoggedIn }) {
   const boardDataFromState = useSelector(boardData);
   const id = boardDataFromState.id;
-
+  const columnsLength = useSelector(columnData);
   const [currentBoard, seCurrentBoard] = useState(id);
 
   const [updateBoardDetail] = useGetActiveBoardMutation();
-  const { data: boards, refetch } = useGetBoardsQuery();
+  const { data: userBoards, refetch } = useGetUserBoardsQuery();
+
   const [columnCreator] = useCreateNewColumnMutation();
 
   const dispatch = useDispatch();
@@ -45,6 +51,7 @@ export default function BoardSelectNav({ isLoggedIn }) {
 
   const getBoard = async (event) => {
     try {
+      
       const tempCurrentBoard = event.target.value;
 
       dispatch(getActiveBoardId(tempCurrentBoard));
@@ -59,8 +66,8 @@ export default function BoardSelectNav({ isLoggedIn }) {
     const column = {
       board: id,
       name: "",
-      position_onBoard: '',
-    }
+      position_on_board: columnsLength.columnsLength,
+    };
     try {
       await columnCreator(column);
     } catch (error) {
@@ -83,7 +90,7 @@ export default function BoardSelectNav({ isLoggedIn }) {
           Рабочая доска
         </InputLabel>
         <BoardSelect
-          defaultValue={""}
+          defaultValue={''}
           sx={{ color: "#fff" }}
           labelId="board-simple-select-helper-label"
           id="board-simple-select-helper"
@@ -91,8 +98,8 @@ export default function BoardSelectNav({ isLoggedIn }) {
           label="Рабочая доска"
           onChange={getBoard}
         >
-          {!!boards &&
-            boards.map((board) => {
+          {!!userBoards &&
+            userBoards.map((board) => {
               const { id, name } = board;
 
               return (

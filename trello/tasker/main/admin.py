@@ -8,9 +8,19 @@ from .models import *
 # Register your models here.
 
 
+# @admin.register(Board)
 class BoardAdmin(admin.ModelAdmin):
     list_display = [field.name for field in Board._meta.fields]
     list_display_links = ['name']
+
+    def save_model(self, request, obj, form, change):
+        # Сохраняем доску
+        super().save_model(request, obj, form, change)
+
+        # Проверяем, если это новая доска и у нее нет владельца, создаем запись в BoardMembership
+        if not change:  # Это новый объект
+            user_profile = request.user  # Получаем профиль пользователя
+            BoardMembership.objects.create(user=user_profile, board=obj, role='owner')
 
 
 admin.site.register(Board, BoardAdmin)
@@ -79,7 +89,7 @@ class UserProfileAdmin(UserAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Personal info', {'fields': ('first_name', 'last_name', 'email')}),
-        ('Custom fields', {'fields': ('roles', 'active_board', 'photo', 'user_information')}),
+        ('Custom fields', {'fields': ('active_board', 'photo', 'user_information')}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
@@ -87,6 +97,10 @@ class UserProfileAdmin(UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'password1', 'password2'),
+            'fields': ('username', 'password1', 'password2', 'email', 'first_name', 'last_name'),
         }),
     )
+
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
+    search_fields = ('username', 'email', 'first_name', 'last_name')
+    ordering = ('username',)

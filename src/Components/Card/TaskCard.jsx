@@ -1,12 +1,10 @@
 import React, { useRef, useEffect, useState } from "react";
-// import Draggable from "react-draggable";
-import { useDispatch } from "react-redux";
+import { createPortal } from "react-dom";
 
 //atlaskit/pragmatic-drag-and-drop
 import {
   draggable,
   dropTargetForElements,
-  monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { setCustomNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview";
 
@@ -27,6 +25,7 @@ import Dialog from "@mui/material/Dialog";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import Paper from "@mui/material/Paper";
+import CardPreview from "../UI/CardPreview";
 
 //import MIU icons
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
@@ -34,10 +33,9 @@ import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 
 //import RTK QUERY
 import { useGetAllChipsQuery } from "../../Redux/chip/chip-operations";
-import { popUpToOpen } from "../../Redux/chip/chip-slice";
+import { useUpdateCardDetailMutation } from "../../Redux/cards/cards-operations";
 
 // import components
-import AllSettingsOfCard from "../../Components/Card/AllSettingsOfCard/AllSettingsOfCard";
 import EditButtonsGroup from "../../Components/Card/EditButtonsGroup/EditButtonsGroup";
 import CardImage from "../../Components/Card/CardImageSection/CardImage";
 import CardChipContainer from "../../Components/Card/CardChipsSection/CardChipContainer";
@@ -45,11 +43,15 @@ import CardStatistic from "../../Components/Card/CardStatisticIconsSection/CardS
 import CardDescription from "../../Components/Card/CardDescriptionSection/CardDescription";
 import CardAvatarSection from "../../Components/Card/Avatar/CardAvatarSection";
 import DropIndicator from "../UI/DropIndicator";
+import { TextareaCardDescription } from "./AllSettingsOfCard/styleConst";
 
 //import styles
 import * as style from "../../constants/ColumnViewStyles";
 
-import { createPortal } from "react-dom";
+import { handleBlockClick, handleBlur } from "../../libs/libs";
+import { useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
+import { popUpToOpen } from "../../Redux/chip/chip-slice";
 
 const PaperComponent = (props) => {
   return <Paper sx={style.draggablePaper} {...props} />;
@@ -68,97 +70,47 @@ export default function TaskCard({
   text,
   status,
   index,
+  chips,
 }) {
-  const dispatch = useDispatch();
-
-  const { data: allChips } = useGetAllChipsQuery();
+  // const { data: allChips } = useGetAllChipsQuery();
+  const [cardTextUpdater] = useUpdateCardDetailMutation();
+  const dispatch = useDispatch()
   const cardRef = useRef(null);
+  const inputRef = useRef(null);
 
   const [showEditIcon, setShowEditIcon] = useState(false);
   const [openPop, setOpenPop] = useState(false);
-  const [popupType, setPopupType] = useState(0);
   const [chipsArr, setChipsArr] = useState([]);
   const [cardDragging, setCardDragging] = useState(false);
   const [preview, setPreview] = useState(null);
   const [closestEdge, setClosestEdge] = useState(null);
   const [placeholderHeight, setPlaceholderHeight] = useState(0);
   const [isEditable, setIsEditable] = useState(false); // Управляем режимом редактирования
+  const [cardText, setCardText] = useState(text);
+  const [cardTextBuffer, setCardTextBuffer] = useState("");
 
-  function Pop(type, handleClickOpen, id, date_time_finish, date_time_start, status) {
-    let pop = null;
-
-    switch (type) {
-      case 1:
-        pop = (
-          <AllSettingsOfCard
-            date_time_finish={date_time_finish}
-            date_time_start={date_time_start}
-            status={status}
-            cardId={id}
-          />
-        );
-        break;
-      case 2:
-        pop = (
-          <EditButtonsGroup columnId={columnId} handleClickOpen={handleClickOpen} cardId={id} />
-        );
-        break;
-
-      default:
-        break;
-    }
-    return pop;
-  }
-
-  const CardPreview = () => {
-    return (
-      <Card sx={{ ...style.cardStyle }}>
-        <CardImage />
-        <CardContent sx={style.CardContentStyle}>
-          <CardChipContainer chips={chipsArr} cardId={id} />
-          <CardDescription cardText={text} />
-          <CardStatistic
-            cardId={id}
-            is_subscribed={is_subscribed}
-            in_process={in_process}
-            comments_how_many={comments_how_many}
-            checklist_how_many={checklist_how_many}
-            is_have_description={is_have_description}
-            date_time_finish={date_time_finish}
-            date_time_start={date_time_start}
-            status={status}
-          />
-          <CardAvatarSection />
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const handleAllSettingsOfCardOpen = (type) => {
-    setOpenPop(true);
-    switch (type) {
-      case 1:
-        setPopupType(type);
-        break;
-      case 2:
-        setPopupType(type);
-        break;
-      default:
-        setPopupType(0);
-    }
-  };
-
-  const handleAllSettingsOfCardClose = () => {
-    setOpenPop(false);
-    setPopupType(0);
-    dispatch(popUpToOpen(0));
-  };
+  const allChips = useSelector((state) => state.chipsApi.queries["getAllChips(undefined)"]?.data);
+  const cardMutation = useSelector((state) => state.cardsApi.mutations)
+console.log('cardMutation ', cardMutation);
 
   useEffect(() => {
     if (!!!allChips) return;
-    const cardChips = allChips.filter((chip) => chip.card.includes(id));
+    const cardChips = chips.map((chip) => {
+      const newChip = allChips.find(el => el.id === chip )
+      return newChip
+    });
+    console.log('fesc  dvd d ');
+    
     setChipsArr(cardChips);
-  }, [allChips, id]);
+  }, [allChips]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      if (inputRef.current) {
+        isEditable && inputRef.current.focus(); // Устанавливаем фокус на текстовое поле
+      }
+    }, 0); // Задержка в 0 мс, чтобы блок успел удалиться
+  }, [isEditable]);
 
   useEffect(() => {
     const element = cardRef.current;
@@ -223,15 +175,11 @@ export default function TaskCard({
     );
   }, [setPreview, setClosestEdge, setCardDragging]);
 
-  const handleBlockClick = () => {
-    setIsEditable(true); // Разблокируем поле при клике на блок
-  };
-
-  const handleBlur = () => {
-    setIsEditable(false); // Блокируем поле при потере фокуса
-  };
-  console.log('isEditable ', isEditable);
-
+  const popClose = () => {
+    setOpenPop(false)
+    dispatch(popUpToOpen(0))
+  }
+  
   return (
     <Box
       ref={cardRef}
@@ -248,14 +196,12 @@ export default function TaskCard({
       >
         {showEditIcon && (
           <Box sx={style.boxEditOutlinedIconStyle}>
-            <IconButton onClick={() => handleAllSettingsOfCardOpen(2)} aria-label="edit">
+            <IconButton onClick={() => setOpenPop(true)} aria-label="edit">
               <EditOutlinedIcon />
             </IconButton>
           </Box>
         )}
-        <Box 
-        // onClick={() => handleAllSettingsOfCardOpen(1)}
-        >
+        <Box>
           <CardImage />
           <CardContent sx={style.CardContentStyle}>
             <CardChipContainer chips={chipsArr} cardId={id} />
@@ -271,10 +217,29 @@ export default function TaskCard({
                   zIndex: 2,
                   cursor: "move",
                 }}
-                onClick={handleBlockClick} // При клике разблокируем текстовое поле
+                onClick={() => handleBlockClick(setIsEditable, setCardTextBuffer, cardText)}
               />
             )}
-            <CardDescription cardText={text} handleBlur={handleBlur} isEditable={isEditable} />
+            <TextareaCardDescription
+              ref={inputRef}
+              onBlur={() =>
+                handleBlur(
+                  setIsEditable,
+                  setCardTextBuffer,
+                  cardText,
+                  cardTextBuffer,
+                  cardTextUpdater,
+                  id,
+                  { text: cardText }
+                )
+              } // Блокируем текстовое поле при потере фокуса
+              aria-label="empty textarea"
+              placeholder="Задайте текст карточке..."
+              value={cardText}
+              onChange={(event) => {
+                setCardText(event.target.value);
+              }}
+            />
             <CardStatistic
               cardId={id}
               is_subscribed={is_subscribed}
@@ -294,7 +259,7 @@ export default function TaskCard({
         sx={{ height: "100%", backgroundColor: "rgba(0, 0, 0, 0.55)" }}
         maxWidth={"xl"}
         open={openPop}
-        onClose={handleAllSettingsOfCardClose}
+        onClose={() => popClose()}
         PaperComponent={PaperComponent}
         aria-labelledby="draggable-dialog-title"
       >
@@ -305,24 +270,40 @@ export default function TaskCard({
               backgroundColor: "#777",
               "&:hover": { backgroundColor: "#ccc" },
             }}
-            onClick={handleAllSettingsOfCardClose}
+            onClick={() => popClose()}
           >
             <CloseOutlinedIcon sx={{ color: "#fff" }} />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={style.dialogContent}>
-          {Pop(
-            popupType,
-            handleAllSettingsOfCardOpen,
-            id,
-            date_time_finish,
-            date_time_start,
-            status
-          )}
+          {<EditButtonsGroup chipsArr={chipsArr} cardId={id} p={{ date_time_finish, date_time_start, status }} />}
         </DialogContent>
       </Dialog>
       {closestEdge && <DropIndicator height={placeholderHeight} />}
-      {preview && createPortal(<CardPreview />, preview)}
+      {preview &&
+        createPortal(
+          <CardPreview
+            CardImage={CardImage}
+            CardContent={CardContent}
+            CardChipContainer={CardChipContainer}
+            CardDescription={CardDescription}
+            CardStatistic={CardStatistic}
+            CardAvatarSection={CardAvatarSection}
+            chipsArr={chipsArr}
+            cardText={cardText}
+            id={id}
+            is_subscribed={is_subscribed}
+            in_process={in_process}
+            comments_how_many={comments_how_many}
+            checklist_how_many={checklist_how_many}
+            is_have_description={is_have_description}
+            date_time_finish={date_time_finish}
+            date_time_start={date_time_start}
+            status={status}
+            style={style}
+          />,
+          preview
+        )}
     </Box>
   );
 }

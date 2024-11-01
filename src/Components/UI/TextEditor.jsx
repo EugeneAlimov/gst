@@ -80,8 +80,6 @@ export default function TextEditor() {
     return () => setIsLayoutReady(false);
   }, []);
 
-  console.log(text);
-
 	const editorConfig = {
 		toolbar: {
 			items: [

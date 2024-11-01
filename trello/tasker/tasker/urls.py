@@ -27,8 +27,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView,
 router = routers.DefaultRouter()
 router.register(r'user', views.UserViewSet, basename='user')
 router.register(r'board', views.BoardsViewSet, basename='board')
+router.register(r'user-boards', views.UserBoardsViewSet, basename='userBoard')
 router.register(r'card-in-column', views.CardInColumnViewSet, basename='cardInColumn')
-# router.register(r'board', views.BoardsViewSet, basename='board')
+router.register(r'board-membership', views.BoardMembershipViewSet, basename='boardMembership')
 router.register(r'card', views.CardViewSet, basename='card')
 router.register(r'column', views.ColumnViewSet, basename='column')
 router.register(r'columns-on-board', views.ColumnsOnBoardViewSet, basename='columnsOnBoard')
@@ -38,13 +39,14 @@ router.register(r'comment', views.CommentViewSet, basename='comment')
 router.register(r'checklist-item', views.ChecklistItemViewSet, basename='checklist-item')
 
 urlpatterns = [
-
                   path('admin/', admin.site.urls),
                   path('api/v1/', include(router.urls)),
                   # path('api/v1/auth/', include('rest_framework.urls')),
                   path('login/', TemplateView.as_view(template_name="index.html")),
                   path('user/', TemplateView.as_view(template_name="index.html")),
                   path('board/', TemplateView.as_view(template_name="index.html")),
+                  path('user-boards/', TemplateView.as_view(template_name="index.html")),
+                  path('board-membership/', TemplateView.as_view(template_name="index.html")),
                   path('card-in-column/', TemplateView.as_view(template_name="index.html")),
                   path('column/', TemplateView.as_view(template_name="index.html")),
                   path('columns-on-board/', TemplateView.as_view(template_name="index.html")),

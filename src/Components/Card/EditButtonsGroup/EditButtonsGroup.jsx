@@ -13,6 +13,8 @@ import ChangeChipsPallet from "../../ChangeChips/ChangeChipsPallet";
 import ChangeUsers from "../ChangeUsers/ChangeUsers";
 import DatesAndTimePallet from "../../DateAndTime/DatesAndTimePallet";
 import CreateNewChip from "../../ChangeChips/CreateNewChip";
+import AllSettingsOfCard from "../AllSettingsOfCard/AllSettingsOfCard";
+
 import { useGetOneCardQuery } from "../../../Redux/cards/cards-operations";
 
 const buttonStyle = {
@@ -27,10 +29,9 @@ const buttonStyle = {
   },
 };
 
-export default function EditButtonsGroup({ handleClickOpen, cardId }) {
+export default function EditButtonsGroup({ cardId, chipsArr }) {
   const { data } = useGetOneCardQuery(cardId);
   const dispatch = useDispatch();
-  console.log('data ', data);
 
   const popUpTypeFromState = useSelector(chipData);
   const popUpType = popUpTypeFromState.popUpType;
@@ -39,8 +40,11 @@ export default function EditButtonsGroup({ handleClickOpen, cardId }) {
     let pop = null;
 
     switch (type) {
+      case 10:
+        pop = <AllSettingsOfCard chipsArr={chipsArr} cardId={cardId} {...data} />;
+        break;
       case 1:
-        pop = <ChangeChipsPallet cardId={cardId} />;
+        pop = <ChangeChipsPallet cardId={cardId} chipsArr={chipsArr} />;
         break;
       case 2:
         pop = <ChangeUsers cardId={cardId} />;
@@ -55,7 +59,7 @@ export default function EditButtonsGroup({ handleClickOpen, cardId }) {
       default:
         break;
     }
-    return <Box sx={{ margin: "10px" }}>{pop}</Box>;
+    return <Box sx={{ marginLeft: "10px" }}>{pop}</Box>;
   }
 
   return (
@@ -68,8 +72,7 @@ export default function EditButtonsGroup({ handleClickOpen, cardId }) {
         margin: "10px",
       }}
     >
-
-      {!!data && <TaskCard {...data} />}
+      {!!data && popUpType !== 10 && <TaskCard {...data} />}
       {popUpType === 0 ? (
         <Box sx={{ margin: "10px" }}>
           <Stack direction="column" justifyContent="center" alignItems="flex-start" spacing={1}>
@@ -78,7 +81,7 @@ export default function EditButtonsGroup({ handleClickOpen, cardId }) {
               color="secondary"
               size="large"
               sx={buttonStyle}
-              onClick={() => handleClickOpen(1)}
+              onClick={() => dispatch(popUpToOpen(10))}
             >
               Открыть карточку
             </Button>

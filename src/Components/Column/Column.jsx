@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
-import Draggable from "react-draggable";
+import React, { useRef, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { createPortal } from "react-dom";
 
 //atlaskit/pragmatic-drag-and-drop
 import {
@@ -9,7 +9,6 @@ import {
   monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { setCustomNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview";
-
 import {
   attachClosestEdge,
   extractClosestEdge,
@@ -27,27 +26,53 @@ import Box from "@mui/material/Box";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListSubheader from "@mui/material/ListSubheader";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+
+import DehazeOutlinedIcon from "@mui/icons-material/DehazeOutlined";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 
 //import RTK QUERY
 import {
   useGetCardsQuery,
   useUpdateCardInColumnMutation,
+  useCreateNewCardMutation,
 } from "../../Redux/cards/cards-operations";
+import { useUpdateColumnDetailsMutation } from "../../Redux/columns/column-operations";
 
 // import components
 import TaskCard from "../Card/TaskCard";
 import DropIndicator from "../UI/DropIndicator";
+import ColumnPreview from "../UI/ColumnPreview";
 
 //import styles
 import * as style from "../../constants/ColumnViewStyles";
 
-import { createPortal } from "react-dom";
+//import constants
+import { cardTemplate } from "../../constants/objects";
 import { TextareaColumnName } from "../Card/AllSettingsOfCard/styleConst";
+import { IconButton, Typography } from "@mui/material";
 
-export default function Column({ height, columnName, columnId, columnIndex, columnOnDrop }) {
+import {
+  newCardCreater,
+  cardOnDrop,
+  cardOnDragStart,
+  handleBlockClick,
+  handleBlur,
+} from "../../libs/libs";
+
+export default function Column({
+  columnName,
+  columnId,
+  columnIndex,
+  boardHeight,
+  activeBoardId,
+}) {
   const { data: CARDS } = useGetCardsQuery(columnId);
 
   const [cardPositionUpdate] = useUpdateCardInColumnMutation();
+  const [cardCreater] = useCreateNewCardMutation();
+  const [headerTextUpdater] = useUpdateColumnDetailsMutation();
 
   const dispatch = useDispatch();
   const storedCard = useSelector(cardData);
@@ -58,53 +83,22 @@ export default function Column({ height, columnName, columnId, columnIndex, colu
   const [closestEdge, setClosestEdge] = useState(null);
   const [placeholderHeight, setPlaceholderHeight] = useState(0);
   const [preview, setPreview] = useState(null);
-  const [textAreaText, setTextAreaText] = useState(columnName);
-  const [isEditable, setIsEditable] = useState(false);  // Управляем режимом редактирования
+  const [headerText, setHeaderText] = useState(columnName);
+  const [headerTextBuffer, setHeaderTextBuffer] = useState("");
+
+  const [isEditable, setIsEditable] = useState(false); // Управляем режимом редактирования
+  const [anchorElUser, setAnchorElUser] = useState(null);
 
   const columnInnerRef = useRef(null);
   const columnRef = useRef(null);
-  const columnHeaderRef = useRef(null)
+  const columnHeaderRef = useRef(null);
 
-  const ColumnPreview = () => {
-    return (
-      <List
-        className="scroll-container"
-        sx={{ ...style.list, maxHeight: `${height - 90}px` }}
-        subheader={
-          <ListSubheader
-            sx={{
-              width: "100%",
-              height: "40px",
-              textAlign: "center",
-            }}
-            titletypographyprops={{
-              fontSize: "20px",
-              color: "#172b4d",
-            }}
-          >
-              <TextareaColumnName
-                disabled={false}
-                aria-label="empty textarea"
-                placeholder="Дайте имя колонке..."
-                value={textAreaText}
-                onChange={(event) => {
-                  setTextAreaText(event.target.value);
-                }}
-              />
-          </ListSubheader>
-        }
-      >
-        {!!cards &&
-          cards.map((card, index) => {
-            const { id } = card;
-            return (
-              <ListItem key={id}>
-                <TaskCard columnId={columnId} {...card} index={index} columnIndex={columnIndex} />
-              </ListItem>
-            );
-          })}
-      </List>
-    );
+  const handleOpenUserMenu = (event) => {
+    setAnchorElUser(event.currentTarget);
+  };
+
+  const handleCloseUserMenu = () => {
+    setAnchorElUser(null);
   };
 
   useEffect(() => {
@@ -113,7 +107,6 @@ export default function Column({ height, columnName, columnId, columnIndex, colu
       newCards.sort((a, b) => {
         a.card_in_columns[0].position_in_column > b.card_in_columns[0].position_in_column ? 1 : -1;
       });
-
       setCards(newCards);
     }
   }, [CARDS]);
@@ -186,17 +179,16 @@ export default function Column({ height, columnName, columnId, columnIndex, colu
           setClosestEdge(null);
           setPlaceholderHeight(0);
         },
-        onDrop: (args) => {
+        onDrop: () => {
           setClosestEdge(null);
           setPlaceholderHeight(0);
-          if (args.source.data.type === "column") columnOnDrop(args);
         },
         getIsSticky: () => true,
       }),
       monitorForElements({
         element,
         onDragStart: (args) => {
-          cardOnDragStart(args);
+          cardOnDragStart(args, cards, dispatch, storeOneCard, setCards);
         },
         onDrag: (args) => {
           if (args.location.current.dropTargets.length === 0) return;
@@ -213,7 +205,7 @@ export default function Column({ height, columnName, columnId, columnIndex, colu
           const targetColumnId = args.location.current.dropTargets[0].data.columnId;
 
           if (targetColumnId === columnId && sourceType === "card") {
-            cardOnDrop(args);
+            cardOnDrop(args, cards, setCards, cardPositionUpdate, storedCard);
           }
           setShowDropIndicatorForEmptyColumn(false);
         },
@@ -222,7 +214,7 @@ export default function Column({ height, columnName, columnId, columnIndex, colu
         element: columnInnerRef.current,
       })
     );
-  }, [cards])
+  }, [cards]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -230,60 +222,7 @@ export default function Column({ height, columnName, columnId, columnIndex, colu
         isEditable && columnHeaderRef.current.focus(); // Устанавливаем фокус на текстовое поле
       }
     }, 0); // Задержка в 0 мс, чтобы блок успел удалиться
-
-  },[isEditable])
-
-  const cardOnDragStart = (args) => {
-    const sourceCardId = args.source.data.cardId;
-    const newCards = Array.from(cards);
-    let removeCardIndex = -1;
-
-    cards.forEach((card, index) => {
-      if (card.id === sourceCardId) {
-        removeCardIndex = index;
-      }
-    });
-
-    const oneCard = cards[removeCardIndex];
-    removeCardIndex !== -1 && dispatch(storeOneCard(oneCard));
-    removeCardIndex !== -1 && newCards.splice(removeCardIndex, 1);
-    setCards(newCards);
-  };
-
-  const cardOnDrop = async (args) => {
-    const targetCardDropPlace = args.location.current.dropTargets[0].data.cardId;
-    const sourceCardIndex = args.source.data.cardIndex;
-
-    const closestEdge = extractClosestEdge(args.location.current.dropTargets[0].data);
-
-    let dropIndex = cards.findIndex((card) => card.id === targetCardDropPlace);
-
-    const newCards = Array.from(cards);
-
-    if (closestEdge === "bottom") dropIndex = dropIndex + 1;
-    if (args.location.current.dropTargets.length === 1) dropIndex = sourceCardIndex;
-
-    dropIndex !== -1 && newCards.splice(dropIndex, 0, storedCard.card);
-    dropIndex !== -1 && setCards(newCards);
-
-    try {
-      const newCardsArr = newCards.map((card, index) => {
-        return { card_id: card.id, index };
-      });
-      const target_column_id = args.location.current.dropTargets[0].data.columnId;
-      cardPositionUpdate({ target_column_id, cards: newCardsArr });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const handleBlockClick = () => {
-    setIsEditable(true);  // Разблокируем поле при клике на блок
-};
-
-const handleBlur = () => {
-    setIsEditable(false);  // Блокируем поле при потере фокуса
-};
+  }, [isEditable]);
 
   return (
     <Box
@@ -293,68 +232,104 @@ const handleBlur = () => {
         flexDirection: closestEdge === "left" ? "row-reverse" : "row",
       }}
     >
-      <div
+      <Box
         id={`column-${columnId}`}
-        style={{
+        sx={{
+          maxHeight: `${boardHeight - 30}px`,
+          borderRadius: "4px",
+          boxShadow: "10",
+          marginLeft: "5px",
+          marginRight: "5px",
+          backgroundColor: "#d5d2d2",
           display: "flex",
           flexDirection: "column",
-          alignContent: "center",
-          alignItems: "center",
-          width: "290px",
           opacity: columnDragging ? "0.5" : "1",
         }}
-        // style={style}
         className="column-container"
       >
         <List
           ref={columnInnerRef}
           className="scroll-container"
-          sx={{ ...style.list, maxHeight: `${height - 90}px` }}
+          sx={{ ...style.list }}
           subheader={
             <ListSubheader
               sx={{
-                readOnly: 'false',
-                display: 'flex',
-                flexDirection:"column",
-                alignItems:"center",
-                padding:"5px",
+                borderTopRightRadius: "4px",
+                borderTopLeftRadius: "4px",
+                readOnly: "false",
+                display: "flex",
+                justifyContent: "space-between",
+                flexDirection: "row",
+                alignItems: "center",
+                paddingY: "5px",
                 width: "100%",
-                height: 'fitcontent',//"40px",
+                height: "fitcontent",
                 textAlign: "center",
               }}
               titletypographyprops={{
-                ":readOnly": 'false',
-
+                ":readOnly": "false",
                 fontSize: "20px",
                 color: "#172b4d",
               }}
             >
               {!isEditable && (
                 <div
-                    style={{
-
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        backgroundColor: 'rgba(0, 0, 0, 0)',  // Прозрачный блок
-                        zIndex: 1,
-                        cursor: 'move',  // Указатель для перетаскивания
-                    }}
-                    onClick={handleBlockClick}  // При клике разблокируем текстовое поле
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "85%",
+                    height: "100%",
+                    backgroundColor: "rgba(0, 0, 0, 0)", // Прозрачный блок
+                    zIndex: 1,
+                    cursor: "move", // Указатель для перетаскивания
+                  }}
+                  onClick={() => handleBlockClick(setIsEditable, setHeaderTextBuffer, headerText)} // При клике разблокируем текстовое поле
                 />
-            )}
+              )}
               <TextareaColumnName
                 ref={columnHeaderRef}
-                onBlur={handleBlur}  // Блокируем текстовое поле при потере фокуса
+                onBlur={() =>
+                  handleBlur(
+                    setIsEditable,
+                    setHeaderTextBuffer,
+                    headerText,
+                    headerTextBuffer,
+                    headerTextUpdater,
+                    columnId,
+                    { name: headerText }
+                  )
+                } // Блокируем текстовое поле при потере фокуса
                 aria-label="empty textarea"
                 placeholder="Дайте имя колонке..."
-                value={textAreaText}
+                value={headerText}
                 onChange={(event) => {
-                  setTextAreaText(event.target.value);
+                  setHeaderText(event.target.value);
                 }}
               />
+              <IconButton onClick={handleOpenUserMenu} sx={{ padding: "2px", borderRadius: "4px" }}>
+                <DehazeOutlinedIcon />
+              </IconButton>
+              <Menu
+                sx={{ mt: "45px" }}
+                id="menu-appbar"
+                anchorEl={anchorElUser}
+                anchorOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+                keepMounted
+                transformOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+                open={Boolean(anchorElUser)}
+                onClose={handleCloseUserMenu}
+              >
+                <MenuItem key={1} onClick={handleCloseUserMenu}>
+                  <Typography textAlign="center">{"Архивировать"}</Typography>
+                </MenuItem>
+              </Menu>
             </ListSubheader>
           }
         >
@@ -363,15 +338,58 @@ const handleBlur = () => {
             cards.map((card, index) => {
               const { id } = card;
               return (
-                <ListItem key={id}>
-                  <TaskCard columnId={columnId} {...card} index={index} columnIndex={columnIndex} />
+                <ListItem
+                  key={id}
+                  sx={{
+                    flexDirection: "column",
+                    paddingBottom: "0px",
+                    paddingLeft: "0px",
+                    paddingRight: "0px",
+                  }}
+                >
+                  <TaskCard columnId={columnId} {...card} index={index} />
                 </ListItem>
               );
             })}
         </List>
-      </div>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            paddingX: "10px",
+            width: "100%",
+            height: "40px",
+            borderBottomLeftRadius: "4px",
+            borderBottomRightRadius: "4px",
+            cursor: "pointer",
+            boxShadow: "10",
+            backgroundColor: "#e1e0e0",
+            "&:hover": {
+              backgroundColor: "#ebeaea",
+            },
+          }}
+          onClick={() => newCardCreater(cardCreater, cardTemplate, activeBoardId, columnId, CARDS)}
+        >
+          <AddOutlinedIcon sx={{ marginX: "5px" }} />
+          <Typography>{"Добавить новую карточку"}</Typography>
+        </Box>
+      </Box>
       {closestEdge && <DropIndicator height={placeholderHeight} />}
-      {preview && createPortal(<ColumnPreview />, preview)}
+      {preview &&
+        createPortal(
+          <ColumnPreview
+            style={style}
+            boardHeight={boardHeight}
+            headerText={headerText}
+            cards={cards}
+            columnId={columnId}
+            columnIndex={columnIndex}
+            TextareaColumnName={TextareaColumnName}
+            TaskCard={TaskCard}
+          />,
+          preview
+        )}
     </Box>
   );
 }

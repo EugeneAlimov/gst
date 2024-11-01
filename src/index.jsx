@@ -6,7 +6,7 @@ import { PersistGate } from "redux-persist/integration/react";
 import { Provider } from "react-redux";
 import routes from "./routes";
 import ScopedCssBaseline from "@mui/material/ScopedCssBaseline";
-import "./libs/time.js";
+// import "./libs/time.js";
 import "./index.css";
 import { RestrictedRout } from "./Components/RestrictedRout.jsx";
 import { PrivateRoutes } from "./Components/PrivateRoutes.jsx";
@@ -18,9 +18,6 @@ const BoardView = lazy(() => import("./Views/BoardView" /* webpackChunkName: 'Bo
 const PageNotFound = lazy(() =>
   import("./Views/PageNotFound" /* webpackChunkName: 'PageNotFound' */)
 );
-
-// const currentUrl = window.location.href;
-// console.log(currentUrl);
 
 const router = createBrowserRouter([
   {
@@ -42,7 +39,7 @@ const router = createBrowserRouter([
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
-  // <React.StrictMode>
+  <React.StrictMode>
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <Suspense>
@@ -52,7 +49,7 @@ root.render(
         </Suspense>
       </PersistGate>
     </Provider>
-  //  </React.StrictMode>
+  </React.StrictMode>
 );
 
 // If you want to start measuring performance in your app, pass a function

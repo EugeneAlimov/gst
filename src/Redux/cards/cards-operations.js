@@ -2,6 +2,8 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { baseURL } from "../axiosDefaults";
 
 export const cardsApi = createApi({
+  refetchOnReconnect: true,
+  refetchOnMountOrArgChange: true,
   reducerPath: "cardsApi",
   tagTypes: ["cards"],
   baseQuery: fetchBaseQuery({
@@ -28,6 +30,15 @@ export const cardsApi = createApi({
           ? [...result.map(({ id }) => ({ type: "cards", id })), { type: "cards", id: "LIST" }]
           : [{ type: "cards", id: "LIST" }],
     }),
+    createNewCard: builder.mutation({
+      query: (cardTemplate) => ({
+        url: `/card/`,
+        method: "POST",
+        body: { ...cardTemplate },
+      }),
+      invalidatesTags: [{ type: "cards", id: "LIST" }],
+    }),
+
     getOneCard: builder.query({
       query: (cardId) => ({
         url: `/card/${cardId}/`,
@@ -35,15 +46,15 @@ export const cardsApi = createApi({
       providesTags: ["cards"],
     }),
     updateCardDetail: builder.mutation({
-      query: ({ cardId, cardObj }) => ({
+      query: ({ cardId, ...patchData }) => ({
         url: `/card/${cardId}/`,
         method: "PATCH",
-        body: { ...cardObj },
+        body: { ...patchData },
       }),
       invalidatesTags: [{ type: "cards", id: "LIST" }],
     }),
     updateCardInColumn: builder.mutation({
-      query: ({source_column_id, target_column_id, cards }) => ({
+      query: ({target_column_id, cards }) => ({
         url: `/card/update-positions/`,
         method: "POST",
         body: { target_column_id, cards },
@@ -55,6 +66,7 @@ export const cardsApi = createApi({
 
 export const {
   useGetCardsQuery,
+  useCreateNewCardMutation,
   useUpdateCardDetailMutation,
   useUpdateCardInColumnMutation,
   useGetOneCardQuery,

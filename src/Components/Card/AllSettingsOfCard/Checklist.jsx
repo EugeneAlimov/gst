@@ -41,7 +41,6 @@ export default function Checklist() {
   const [IDofTheLastCreatedCheckListRow, setIDofTheLastCreatedCheckListRow] = useState(0);
 
   useEffect(() => {
-    console.log("dsadasd");
     checkedRowsCounter(checkListItems, setProgress);
   }, [checkListItems]);
 

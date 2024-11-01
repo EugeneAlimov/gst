@@ -1,17 +1,46 @@
-import React, {useState} from "react";
+import React, { useEffect, useState } from "react";
+
+//import MUI components
 import Typography from "@mui/material/Typography";
 import Link from "@mui/material/Link";
 import Icon from "@mui/material/Icon";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
 
+//import MUI icons
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 
+//import styles
 import * as Style from "./styleConst";
 
+//import components
 import { TextareaCardName } from "./styleConst";
 
+//import RTK QUERY
+import { useSelector } from "react-redux";
 
-export default function Header() {
-    const [textAreaText, setTextAreaText] = useState("");
+export default function Header({ text, column_id }) {
+  const columnsList = useSelector((state) => state.columnsApi.queries["getColumns(1)"]?.data);
+
+  const [textAreaText, setTextAreaText] = useState(text);
+  const [inColumn, setInColumn] = useState({});
+  const [anchorInColumn, setAnchorInColumn] = useState(null);
+
+
+  useEffect(() => {
+    const col = columnsList.find((el) => el.id === column_id);
+    setInColumn(col);
+  }, [columnsList, columnsList]);
+
+  const handleOpenInColumnMenu = (event) => {
+    console.log('g ughiuhkl');
+    
+    setAnchorElUser(event.currentTarget);
+  };
+
+  const handleCloseInColumnMenu = (event) => {
+    !anchorInColumn ? setAnchorInColumn(null) : setAnchorInColumn(event.currentTarget);
+  };
 
   return (
     <>
@@ -29,10 +58,36 @@ export default function Header() {
         }}
       />
       <Typography sx={Style.typographyOnTheColumn}>
-        В колонке:{" "}
+        {"В колонке: "}
         <Link href="#" sx={Style.linkOnTheColumn}>
-          В работе
+          {inColumn.name}
         </Link>
+        <Menu
+                sx={{ mt: "45px" }}
+                id="menu-appbar"
+                anchorEl={anchorInColumn}
+                anchorOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+                keepMounted
+                transformOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+                open={Boolean(anchorInColumn)}
+                onClose={handleCloseInColumnMenu}
+                onClick={handleOpenInColumnMenu}
+              >
+                <MenuItem key={1} onClick={handleCloseInColumnMenu}>
+                  <Typography textAlign="center">{"Архивировать"}</Typography>
+                </MenuItem>
+                <MenuItem key={2} onClick={handleCloseInColumnMenu}>
+                  <Typography textAlign="center">{"Архивировать"}</Typography>
+                </MenuItem>
+
+              </Menu>
+
       </Typography>
     </>
   );

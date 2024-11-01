@@ -37,7 +37,7 @@ export const TextareaCardDescription = styled(BaseTextareaAutosize)(
 export const TextareaColumnName = styled(BaseTextareaAutosize)(
   () => `
     box-sizing: border-box;
-    width: 95%;
+    width: 85%;
     height: fit-content;
     font-family: 'Roboto';
     font-size: 16px;

@@ -2,15 +2,32 @@ from django.contrib.auth.models import AbstractUser, PermissionsMixin
 from django.db import models
 
 
+# class UserProfile(AbstractUser, PermissionsMixin):
+#     active_board = models.IntegerField(blank=True, null=True, default=1, verbose_name='Активная доска')
+#     roles = models.IntegerField(blank=True, null=True, default=3, verbose_name='Роль')
+#     photo = models.ImageField(blank=True, null=True, default=None, verbose_name='Фото пользователя')
+#     user_information = models.CharField(max_length=1000, blank=True, null=True, default=None,
+#                                         verbose_name='Информация о пользователе')
+#
+#     def __str__(self):
+#         return "%s" % self.username
+#
+#     class Meta:
+#         verbose_name = 'Профиль пользователя'
+#         verbose_name_plural = 'Профили пользователей'
+
 class UserProfile(AbstractUser, PermissionsMixin):
     active_board = models.IntegerField(blank=True, null=True, default=1, verbose_name='Активная доска')
-    roles = models.IntegerField(blank=True, null=True, default=3, verbose_name='Роль')
+    # Удаляем поле roles, если роль теперь хранится в BoardMembership
+    # roles = models.IntegerField(blank=True, null=True, default=3, verbose_name='Роль')
     photo = models.ImageField(blank=True, null=True, default=None, verbose_name='Фото пользователя')
-    user_information = models.CharField(max_length=1000, blank=True, null=True, default=None,
-                                        verbose_name='Информация о пользователе')
+    user_information = models.CharField(
+        max_length=1000, blank=True, null=True, default=None,
+        verbose_name='Информация о пользователе'
+    )
 
     def __str__(self):
-        return "%s" % self.username
+        return self.username
 
     class Meta:
         verbose_name = 'Профиль пользователя'
@@ -18,18 +35,76 @@ class UserProfile(AbstractUser, PermissionsMixin):
 
 
 class Board(models.Model):
-    user = models.ManyToManyField(UserProfile, blank=True, default=None, verbose_name='Пользователь')
+    name = models.CharField(max_length=100, blank=True, null=True, default=None, verbose_name='Название')
+    # is_active = models.BooleanField(blank=True, null=True, default=False, verbose_name='Активна')
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
-    name = models.CharField(max_length=100, blank=True, null=True, default=None, verbose_name='Название')
-    is_active = models.BooleanField(blank=True, null=True, default=False, verbose_name='Активна')
+    # Опциональное поле для указания владельца доски
+    owner = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='owned_boards',
+        verbose_name='Владелец'
+    )
 
     def __str__(self):
-        return "%s" % self.name
+        return self.name
 
     class Meta:
         verbose_name = 'Доска'
         verbose_name_plural = 'Доски'
+
+
+class BoardMembership(models.Model):
+    ROLE_CHOICES = (
+        ('owner', 'Владелец'),
+        ('admin', 'Администратор'),
+        ('member', 'Участник'),
+        ('guest', 'Гость'),
+    )
+
+    user = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name='board_memberships',
+        verbose_name='Пользователь'
+    )
+    board = models.ForeignKey(
+        Board,
+        on_delete=models.CASCADE,
+        related_name='board_memberships',
+        verbose_name='Доска'
+    )
+    role = models.CharField(
+        max_length=50,
+        choices=ROLE_CHOICES,
+        default='member',
+        verbose_name='Роль'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата добавления')
+
+    class Meta:
+        unique_together = ('user', 'board')
+        verbose_name = 'Участие в доске'
+        verbose_name_plural = 'Участия в досках'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.board.name} ({self.role})"
+
+
+# class Board(models.Model):
+#     user = models.ManyToManyField(UserProfile, blank=True, default=None, verbose_name='Пользователь')
+#     created = models.DateTimeField(auto_now_add=True)
+#     updated = models.DateTimeField(auto_now=True)
+#     name = models.CharField(max_length=100, blank=True, null=True, default=None, verbose_name='Название')
+#     # is_active = models.BooleanField(blank=True, null=True, default=False, verbose_name='Активна')
+#
+#     def __str__(self):
+#         return "%s" % self.name
+#
+#     class Meta:
+#         verbose_name = 'Доска'
+#         verbose_name_plural = 'Доски'
 
 
 class Column(models.Model):
@@ -57,6 +132,9 @@ class Card(models.Model):
     name = models.CharField(max_length=100, blank=True, null=True, default=None, verbose_name='Name')
     header_color = models.CharField(max_length=100, blank=True, null=True, default=None, verbose_name='Header color')
     text = models.CharField(max_length=5000, blank=True, null=True, default=None, verbose_name='Text card')
+
+    chips = models.ManyToManyField('Chip', blank=True, default=None, verbose_name='Chip')
+
     # position_in_column = models.IntegerField(blank=True, null=True, default=1, verbose_name='Position in column')
     status = models.IntegerField(blank=True, null=True, default=0, verbose_name='Status')
     comments_how_many = models.IntegerField(blank=True, null=True, default=0, verbose_name='Comments how many')
@@ -93,7 +171,7 @@ class CardInColumn(models.Model):
 
 
 class Chip(models.Model):
-    card = models.ManyToManyField(Card, blank=True, default=None, verbose_name='Card')
+    # card = models.ManyToManyField(Card, blank=True, default=None, verbose_name='Card')
     text = models.CharField(max_length=500, blank=True, null=True, default=None, verbose_name='Chip text')
     color_number = models.IntegerField(blank=True, null=True, default=0, verbose_name='Chip color number')
     created = models.DateTimeField(auto_now_add=True)

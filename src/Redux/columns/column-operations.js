@@ -52,6 +52,14 @@ export const columnsApi = createApi({
       }),
       invalidatesTags: [{ type: "columns", id: "LIST" }],
     }),
+    UpdateColumnDetails: builder.mutation({
+      query: ({id, field }) => ({
+        url: `/column/${id}/`,
+        method: "PATCH",
+        body: { ...field },
+      }),
+      invalidatesTags: [{ type: "columns", id: "LIST" }],
+    }),
   }),
 });
 
@@ -60,4 +68,5 @@ export const {
   useGetColumnDetailMutation,
   useCreateNewColumnMutation,
   useUpdateColumnsPositionsMutation,
+  useUpdateColumnDetailsMutation
 } = columnsApi;

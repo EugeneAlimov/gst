@@ -20,11 +20,12 @@ import ChipContainer from "./ChipContainer";
 
 // import constants
 // import { chipColor } from "../../constants/colorsConst";
-import { useGetAllChipsQuery, useUpdateChipMutation } from "../../Redux/chip/chip-operations";
+import { useGetAllChipsQuery } from "../../Redux/chip/chip-operations";
+import { useUpdateCardDetailMutation } from "../../Redux/cards/cards-operations";
 
-export default function ChangeChipsPallet({ cardId }) {
+export default function ChangeChipsPallet({ cardId, chipsArr }) {
   const { data: chips } = useGetAllChipsQuery();
-  const [updateChip] = useUpdateChipMutation();
+  const [updateCard] = useUpdateCardDetailMutation();
 
   const dispatch = useDispatch();
 
@@ -32,12 +33,18 @@ export default function ChangeChipsPallet({ cardId }) {
   const [chipList, setChipList] = useState([]);
   const [searchText, setSearchText] = useState("");
 
+// console.log('chips ', chips);
+// console.log('chipsArr ', chipsArr);
+
   useEffect(() => {
     let arr = JSON.parse(JSON.stringify(chips));
 
     const newArr = arr.reduce((accumulator, item) => {
       item.checked = false;
-      if (item.card.includes(cardId)) item.checked = true;
+
+      chipsArr.forEach((el) => {
+        if (el.id === item.id) item.checked = true;
+      });
 
       if (searchText === "") {
         switch (buttonsState) {
@@ -61,26 +68,34 @@ export default function ChangeChipsPallet({ cardId }) {
     }, []);
 
     setChipList(newArr);
-  }, [buttonsState, cardId, chips, searchText]);
+  }, [buttonsState, chipsArr, chips, searchText]);
 
-  const chipRelateToCardUpdate = async (id, chipId) => {
-    let arr = JSON.parse(JSON.stringify(chipList));
+  const chipRelateToCardUpdate = async (chipId) => {
+    let arr = JSON.parse(JSON.stringify(chipsArr));
     let newArr = [];
 
-    arr.forEach((element) => {
+    chipList.forEach((element) => {
       if (element.id === chipId) {
-        if (element.checked) newArr = [...element.card.filter((el) => el !== id)];
+        console.log("elemnt ", element);
+
+        if (element.checked) {
+          newArr = [...arr.filter((el) => el.id !== chipId)];
+        }
         if (!element.checked) {
-          element.card.push(id);
-          newArr = [...element.card];
+          arr.push(chips[chips.findIndex((el) => el.id === chipId)]);
+          newArr = [...arr];
         }
       }
     });
 
-    const updateChipObj = { card: newArr };
+    const finalArr = newArr.map((el) => {
+      return el.id;
+    });
+
+    const chipsObj = { cardId, chips: finalArr };
 
     try {
-      updateChip({ chipId, updateChipObj });
+      updateCard(chipsObj);
     } catch (error) {
       console.log(error);
     }

@@ -1,28 +1,41 @@
-from django.shortcuts import render
 import json
-
-from django.contrib.auth.models import User
-from django.http import HttpResponse
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.renderers import JSONRenderer
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from .models import *
 from .serializers import *
-from django.http import Http404
 
-
-# Create your views here.
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
+
+
+class UserBoardsViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = BoardMembership.objects.all()
+    serializer_class = BoardSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Получаем все BoardMembership пользователя
+        user_memberships = BoardMembership.objects.filter(user=self.request.user)
+
+        # Возвращаем доски, к которым принадлежит пользователь через BoardMembership
+        return Board.objects.filter(board_memberships__in=user_memberships)
+
+
+class BoardMembershipViewSet(viewsets.ModelViewSet):
+    queryset = BoardMembership.objects.all()
+    serializer_class = BoardMembershipSerializer
+
+    def get_queryset(self):
+        # Фильтрация по доске, если это необходимо
+        board_id = self.request.query_params.get('board', None)
+        if board_id:
+            return BoardMembership.objects.filter(board_id=board_id)
+        return BoardMembership.objects.all()
 
 
 class BoardsViewSet(viewsets.ModelViewSet):
@@ -31,6 +44,7 @@ class BoardsViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
+        """"Получаем доски пользователя"""
         user = self.request.user
 
         response = Board.objects.filter(user=user)
@@ -38,6 +52,7 @@ class BoardsViewSet(viewsets.ModelViewSet):
         return response
 
     def partial_update(self, request, *args, **kwargs):
+        """"Изменяем активную доску"""
         board = request.data
         board_copy = board.copy()
 
@@ -72,6 +87,7 @@ class ColumnViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
+        """"Получаем все колонки, которые относятся к доске"""
         try:
             board = self.request.GET.get('board')
             response = Column.objects.filter(board=board)
@@ -81,6 +97,27 @@ class ColumnViewSet(viewsets.ModelViewSet):
 
             return Response({"error": "Object not found"}, status=404)
 
+    def partial_update(self, request, *args, **kwargs):
+        """"Изменяем имя колонки"""
+        pk = kwargs.get('pk', None)
+        errors = []
+        name = request.data.get('name')
+        if not pk:
+            return Response({"error": "Method PUT not allowed: no pk"})
+
+        try:
+            Column.objects.update_or_create(
+                id=pk,
+                defaults={'name': name}
+            )
+        except Exception as e:
+            errors.append(str(e))
+
+            if errors:
+                return Response({'errors': errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(status=status.HTTP_200_OK)
+
 
 class ColumnsOnBoardViewSet(viewsets.ModelViewSet):
     queryset = Column.objects.all()
@@ -88,9 +125,11 @@ class ColumnsOnBoardViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
 
     def partial_update(self, request, *args, **kwargs):
+        """"Обновить положение колонок на доске.
+            передается id доски чтобы отфильтровать колонки на этой доске"""
         columns = request.data.get('columns')
         pk = kwargs.get('pk', None)
-
+        print('request.data columns ', request.data)
         if not pk:
             return Response({"error": "Method PUT not allowed: no pk"})
 
@@ -119,32 +158,6 @@ class CardInColumnViewSet(viewsets.ModelViewSet):
     serializer_class = CardInColumnSerializer
     permission_classes = (IsAuthenticated,)
 
-    def partial_update(self, request, *args, **kwargs):
-        cards = request.data.get('cards')
-        pk = kwargs.get('pk', None)
-        print('cards ', cards)
-        if not pk:
-            return Response({"error": "Method PUT not allowed: no pk"})
-
-        cards_queryset = CardInColumn.objects.filter(column=pk)
-
-        if cards_queryset.exists():
-            for c_s in cards_queryset:
-                c_s_id = c_s.id
-
-                for c in cards:
-                    if c['id'] == c_s_id:
-                        index = c['index']
-                        c_s.position_in_column = index
-                    c_s.save()
-            try:
-                instance = CardInColumn.objects.filter(card=pk)
-                serializer = BoardSerializer(instance)
-
-                return Response(serializer.data)
-            except CardInColumn.DoesNotExist:
-                return Response({"error": "Object not found"}, status=404)
-
 
 class CardViewSet(viewsets.ModelViewSet):
     queryset = Card.objects.all()
@@ -152,6 +165,7 @@ class CardViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
+        """"Получить все карточки в колонке"""
         column_id = self.request.query_params.get('column')
         if column_id:
             return Card.objects.filter(card_in_columns__column_id=column_id).order_by(
@@ -160,6 +174,8 @@ class CardViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='update-positions')
     def update_positions(self, request):
+        """"Oбновить позиции всех карточек в колонке
+            Используем метод POST потому что нужно передать массив карточек - без id"""
         # Using a set to keep track of processed items to avoid duplicates
         processed_items = set()
         errors = []
@@ -173,7 +189,6 @@ class CardViewSet(viewsets.ModelViewSet):
             if (card_id, index) in processed_items:
                 errors.append(f"Duplicate entry for card_id {card_id} and column_id {index}")
                 continue
-
             processed_items.add((card_id, index))
 
             try:
@@ -190,6 +205,7 @@ class CardViewSet(viewsets.ModelViewSet):
         return Response({'success': 'Card positions updated'}, status=status.HTTP_200_OK)
 
     def retrieve(self, request, *args, **kwargs):
+        """"Получить расположение карточки в разных колонках"""
         instance = self.get_object()
         serializer = self.get_serializer(instance)
 
@@ -202,6 +218,32 @@ class CardViewSet(viewsets.ModelViewSet):
         data['card_in_columns'] = card_in_columns_serializer.data
 
         return Response(data)
+
+    def perform_create(self, serializer):
+        """"Создаем новую карточку - Создание новой и подготовка полей"""
+        # Сначала создаем карту без привязки к пользователям
+        card = serializer.save()
+
+        # Предположим, что текущий пользователь является экземпляром UserProfile и мы хотим его добавить к карте
+        # Например, добавляем текущего пользователя к ManyToMany полю
+        user_profile = UserProfile.objects.get(username=self.request.user)  # Получаем профиль текущего пользователя
+        card.user.add(user_profile)
+        column_id = self.request.data.get('column_id')
+        position_in_column = self.request.data.get('position_in_column', 0)
+        column = get_object_or_404(Column, id=column_id)
+        CardInColumn.objects.create(card=card, column=column, position_in_column=position_in_column)
+
+    def create(self, request, *args, **kwargs):
+        """"Создаем новую карточку - Сохранение"""
+        serializer = self.get_serializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        self.perform_create(serializer)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class ChipViewSet(viewsets.ModelViewSet):

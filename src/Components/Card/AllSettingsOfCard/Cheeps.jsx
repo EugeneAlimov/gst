@@ -16,19 +16,20 @@ import * as Style from "./styleConst";
 import { chipColor } from "../../../constants/colorsConst";
 import { chipStyleCreateNewChip } from "../../../constants/chipContainerStyle";
 
-export default function Cheeps() {
+export default function Cheeps({ chipsArr, chipText }) {
   return (
     <Box sx={Style.cheepsBox}>
       <Typography sx={Style.text}>Метки</Typography>
       <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "wrap" }}>
-        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map((index) => {
-          const labelId = `checkbox-list-label-${index}`;
+        {chipsArr.map((chip) => {
+          const labelId = `checkbox-list-label-${chip.text}`;
           return (
             <CardChip
-              key={index}
-              color={chipColor[index]}
+              key={chip.id}
+              color={chipColor[chip.color_number]}
               labelId={labelId}
               chipStyle={chipStyleCreateNewChip}
+              chipText={chip.text}
             />
           );
         })}

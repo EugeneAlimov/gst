@@ -1,13 +1,12 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 //atlaskit/pragmatic-drag-and-drop
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
-import { extractClosestEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 
 //redux states
-import { columnData, storeOneColumn } from "../Redux/columns/column-slice";
+import { columnData, storeOneColumn, storeColumnsLength } from "../Redux/columns/column-slice";
 
 import "@fontsource/roboto/400.css";
 
@@ -26,11 +25,15 @@ import Column from "../Components/Column/Column";
 
 import useWindowDimensions from "../libs/useWindowDimentions";
 
-export default function ColumnsView() {
+import { columnDragStart, columnOnDrop } from "../libs/libs";
+import { useGetAllChipsQuery } from "../Redux/chip/chip-operations";
+
+export default function ColumnsView({ boardHeight, activeBoardId }) {
   const boardDataFromState = useSelector(boardData);
   const acitiveBoardId = boardDataFromState.id;
 
   const { data: COLUMNS } = useGetColumnsQuery(acitiveBoardId);
+  const { data: allChips } = useGetAllChipsQuery();
 
   const [columnPositionUpdate] = useUpdateColumnsPositionsMutation();
 
@@ -50,8 +53,18 @@ export default function ColumnsView() {
       newColumns.sort((a, b) => (a.position_on_board > b.position_on_board ? 1 : -1));
 
       setColumns(newColumns);
+      dispatch(storeColumnsLength(newColumns.length));
     }
   }, [COLUMNS]);
+
+  useEffect(() => {
+    if (!!!allChips) return;
+    // console.log('allChips', allChips);
+    
+    // const cardChips = allChips.filter((chip) => chip.card.includes(id));
+    // setChipsArr(cardChips);
+  }, [allChips]);
+
 
   useEffect(() => {
     const element = ref.current;
@@ -61,71 +74,24 @@ export default function ColumnsView() {
         onDragStart: (args) => {
           const type = args.source.data.type;
           if (type === "column") {
-            columnDragStart(args);
+            columnDragStart(args, columns, dispatch, storeOneColumn, setColumns);
           }
         },
         onDrop: (args) => {
           if (args.source.data.type === "card") return;
-          // columnOnDrop(args);
+          if (args.source.data.type === "column")
+            columnOnDrop(
+              args,
+              columns,
+              setColumns,
+              columnPositionUpdate,
+              acitiveBoardId,
+              storedColumn
+            );
         },
       })
     );
   }, [columns]);
-
-  const columnDragStart = (args) => {
-    const sourcecolumnId = args.source.data.columnId;
-    const newColumns = Array.from(columns);
-    let removeColumnIndex = -1;
-
-    columns.forEach((column, index) => {
-      if (column.id === sourcecolumnId) {
-        removeColumnIndex = index;
-      }
-    });
-
-    const oneColumn = columns[removeColumnIndex];
-    removeColumnIndex !== -1 && dispatch(storeOneColumn(oneColumn));
-    removeColumnIndex !== -1 && newColumns.splice(removeColumnIndex, 1);
-    setColumns(newColumns);
-  };
-
-  const columnOnDrop = async (args) => {
-    let data;
-    let dropIndex;
-    let targetColumnDropPlace;
-    const targetLenght = args.location.current.dropTargets.length;
-    const newColumns = Array.from(columns);
-
-    if (targetLenght > 0) {
-      data =
-        targetLenght === 1
-          ? args.location.current.dropTargets[0].data
-          : args.location.current.dropTargets[1].data;
-
-      targetColumnDropPlace = data.columnId;
-      const closestEdge = extractClosestEdge(data);
-
-      dropIndex = columns.findIndex((column) => column.id === targetColumnDropPlace);
-
-      if (closestEdge === "right") dropIndex = dropIndex + 1;
-    } else {
-      dropIndex = args.source.data.columnIndex;
-    }
-
-    dropIndex !== -1 && newColumns.splice(dropIndex, 0, storedColumn.column);
-    dropIndex !== -1 && setColumns(newColumns);
-
-    try {
-      const columnsArr = newColumns.map((column, index) => {
-        return { id: column.id, index };
-      });
-
-      columnPositionUpdate({ id: acitiveBoardId, columns: columnsArr });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-console.log('columns ', columns);
 
   return (
     <Stack
@@ -138,15 +104,16 @@ console.log('columns ', columns);
     >
       {!!COLUMNS &&
         columns.map((column, index) => {
-          const { id: columnId, name, position_on_board } = column;
+          const { id: columnId, name } = column;
           return (
             <Column
               key={columnId}
-              height={height}
               columnName={name}
               columnId={columnId}
               columnIndex={index}
               columnOnDrop={columnOnDrop}
+              activeBoardId={activeBoardId}
+              boardHeight={boardHeight}
             />
           );
         })}

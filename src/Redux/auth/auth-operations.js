@@ -3,8 +3,8 @@ import axios from "axios";
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { baseURL } from "../axiosDefaults";
 // axios.defaults.baseURL = "http://127.0.0.1:8000/api/v1";
-axios.defaults.baseURL = baseURL//"http://ec2-16-170-220-252.eu-north-1.compute.amazonaws.com/api/v1";
-axios.defaults.timeout = 1500
+axios.defaults.baseURL = baseURL; //"http://ec2-16-170-220-252.eu-north-1.compute.amazonaws.com/api/v1";
+axios.defaults.timeout = 1500;
 
 const accessToken = {
   set(token) {
@@ -37,7 +37,7 @@ export const register = createAsyncThunk("auth/register", async (credentials) =>
 
 //логин пользователя
 export const logIn = createAsyncThunk("auth/login", async (credentials) => {
-  console.log('credentials ', credentials);
+  console.log("credentials ", credentials);
   try {
     const { data } = await axios.post("/token/", credentials);
 

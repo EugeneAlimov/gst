@@ -53,7 +53,7 @@ export const dialogTitle = {
 };
 
 export const dialogContent = {
-  maxWidth: "768px",
+  // maxWidth: "768px",
   // maxWidth: "fit-content",
   overflowY: "auto",
   overflowX: "hidden",
@@ -79,10 +79,6 @@ export const draggablePaper = {
     alignItems: "center",
     alignContent: "center",
     width: "280px",
-    marginTop: "10px",
-    borderRadius: "4px",
-    bgcolor: "gray",
-    boxShadow: "10",
     overflow: "auto",
     msOverflowStyle: "none" /* IE и Edge */,
     scrollbarWidth: "none" /* Firefox */,

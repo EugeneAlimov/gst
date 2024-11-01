@@ -44,7 +44,7 @@ export default function ChipContainer({
   return (
     <Box sx={boxStylehipContainer}>
       <ListItemButton
-        onClick={() => chipRelateToCardUpdate(cardId, chipId)}
+        onClick={() => chipRelateToCardUpdate(chipId)}
         sx={{
           padding: "0px",
           height: "32px",

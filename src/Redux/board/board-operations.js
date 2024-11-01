@@ -16,14 +16,24 @@ export const boardsApi = createApi({
     },
   }),
   endpoints: (builder) => ({
-    getBoards: builder.query({
+    getUserBoards: builder.query({
       query: () => ({
-        url: `/board/`,
+        url: `/user-boards/`,
       }),
       providesTags: (result) =>
         result
           ? [...result.map(({ id }) => ({ type: "boards", id })), { type: "boards", id: "LIST" }]
           : [{ type: "boards", id: "LIST" }],
+    }),
+    getBoards: builder.query({
+      query: () => ({
+        url: `/board/`,
+      }),
+      providesTags: ["boards"],
+      // providesTags: (result) =>
+      //   result
+      //     ? [...result.map(({ id }) => ({ type: "boards", id })), { type: "boards", id: "LIST" }]
+      //     : [{ type: "boards", id: "LIST" }],
     }),
     getBoardDetail: builder.query({
       query: (id) => ({
@@ -42,4 +52,9 @@ export const boardsApi = createApi({
   }),
 });
 
-export const { useGetBoardsQuery, useGetBoardDetailQuery, useGetActiveBoardMutation } = boardsApi;
+export const {
+  useGetUserBoardsQuery,
+  useGetBoardsQuery,
+  useGetBoardDetailQuery,
+  useGetActiveBoardMutation,
+} = boardsApi;
