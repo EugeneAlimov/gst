@@ -11,16 +11,11 @@ import ColumnsView from "./ColumnsView";
 
 //import utilites
 import useWindowDimensions from "../libs/useWindowDimentions";
-
-//import states from Redux
-import { boardData } from "../Redux/board/board-slice";
-import { useGetUserBoardsQuery } from "../Redux/board/board-operations";
+import { useGetAllChipsQuery } from "../Redux/chip/chip-operations";
 
 export default function BoardView() {
-  useGetUserBoardsQuery();
-  
-  const boardDataFromState = useSelector(boardData);
-  const activeBoardId = boardDataFromState.id;
+  const boardLoaded = useSelector((state) => state.userApi.queries["getUsers(undefined)"]?.status);
+  const { data: allChips } = useGetAllChipsQuery();
 
   const [width, height] = useWindowDimensions();
   const [boardHeight, setBoardHeight] = useState(0);
@@ -53,7 +48,7 @@ export default function BoardView() {
         overflowY: "hidden",
       }}
     >
-      {activeBoardId && <ColumnsView activeBoardId={activeBoardId} boardHeight={boardHeight} />}
+      {boardLoaded === "fulfilled" && <ColumnsView allChips={allChips} boardHeight={boardHeight} />}
     </Box>
   );
 }

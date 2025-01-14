@@ -2,7 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
   boards: [],
-  id: 0,
+  id: null,
   name: "",
   created: null,
   updated: null,
@@ -15,14 +15,6 @@ const boardSlice = createSlice({
   reducers: {
     getActiveBoardId: (state, actions) => {
       state.id = actions.payload;
-    },
-    setActiveBoardToDefault: (state) => {
-      state.boards = [];
-      state.id = 0
-      state.name = ""
-      state.created = null
-      state.updated = null
-      state.users = []
     },
   },
 });

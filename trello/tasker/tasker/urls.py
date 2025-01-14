@@ -21,8 +21,11 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.views.generic import TemplateView
 from main import views
+
 from rest_framework import routers
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView, TokenRefreshView, TokenBlacklistView
+
+from main.views import UpdateActiveBoardView
 
 router = routers.DefaultRouter()
 router.register(r'user', views.UserViewSet, basename='user')
@@ -30,6 +33,9 @@ router.register(r'board', views.BoardsViewSet, basename='board')
 router.register(r'user-boards', views.UserBoardsViewSet, basename='userBoard')
 router.register(r'card-in-column', views.CardInColumnViewSet, basename='cardInColumn')
 router.register(r'board-membership', views.BoardMembershipViewSet, basename='boardMembership')
+
+# router.register(r'update-active-board', views.UpdateActiveBoardViewSet, basename='updateActiveBoard')
+
 router.register(r'card', views.CardViewSet, basename='card')
 router.register(r'column', views.ColumnViewSet, basename='column')
 router.register(r'columns-on-board', views.ColumnsOnBoardViewSet, basename='columnsOnBoard')
@@ -45,6 +51,9 @@ urlpatterns = [
                   path('login/', TemplateView.as_view(template_name="index.html")),
                   path('user/', TemplateView.as_view(template_name="index.html")),
                   path('board/', TemplateView.as_view(template_name="index.html")),
+
+                  path('api/v1/update-active-board/', UpdateActiveBoardView.as_view(), name='update_active_board'),
+
                   path('user-boards/', TemplateView.as_view(template_name="index.html")),
                   path('board-membership/', TemplateView.as_view(template_name="index.html")),
                   path('card-in-column/', TemplateView.as_view(template_name="index.html")),

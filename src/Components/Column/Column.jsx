@@ -61,13 +61,7 @@ import {
   handleBlur,
 } from "../../libs/libs";
 
-export default function Column({
-  columnName,
-  columnId,
-  columnIndex,
-  boardHeight,
-  activeBoardId,
-}) {
+export default function Column({ columnName, columnId, columnIndex, boardHeight, activeBoardId, allChips }) {
   const { data: CARDS } = useGetCardsQuery(columnId);
 
   const [cardPositionUpdate] = useUpdateCardInColumnMutation();
@@ -107,6 +101,7 @@ export default function Column({
       newCards.sort((a, b) => {
         a.card_in_columns[0].position_in_column > b.card_in_columns[0].position_in_column ? 1 : -1;
       });
+      
       setCards(newCards);
     }
   }, [CARDS]);
@@ -328,6 +323,9 @@ export default function Column({
               >
                 <MenuItem key={1} onClick={handleCloseUserMenu}>
                   <Typography textAlign="center">{"Архивировать"}</Typography>
+                </MenuItem>{" "}
+                <MenuItem key={2} onClick={handleCloseUserMenu}>
+                  <Typography textAlign="center">{"Сменить доску"}</Typography>
                 </MenuItem>
               </Menu>
             </ListSubheader>
@@ -347,7 +345,7 @@ export default function Column({
                     paddingRight: "0px",
                   }}
                 >
-                  <TaskCard columnId={columnId} {...card} index={index} />
+                  <TaskCard columnId={columnId} {...card} index={index} allChips={allChips} />
                 </ListItem>
               );
             })}

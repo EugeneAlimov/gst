@@ -1,29 +1,64 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .forms import UserProfileChangeForm
+from django.db import transaction
+from django import forms
 
 from .models import *
 
 
 # Register your models here.
 
-
-# @admin.register(Board)
 class BoardAdmin(admin.ModelAdmin):
     list_display = [field.name for field in Board._meta.fields]
     list_display_links = ['name']
 
     def save_model(self, request, obj, form, change):
-        # Сохраняем доску
-        super().save_model(request, obj, form, change)
+        # Начинаем транзакцию для атомарности
+        with transaction.atomic():
+            # Сохраняем объект Board (доску)
+            super().save_model(request, obj, form, change)
 
-        # Проверяем, если это новая доска и у нее нет владельца, создаем запись в BoardMembership
-        if not change:  # Это новый объект
-            user_profile = request.user  # Получаем профиль пользователя
-            BoardMembership.objects.create(user=user_profile, board=obj, role='owner')
+            if not change:  # Если доска новая
+                user_profile = request.user  # Получаем профиль текущего пользователя
+                BoardMembership.objects.create(user=user_profile, board=obj, role='owner')
+            else:  # Если доска уже существует
+                # Получаем текущего владельца
+                current_owner = BoardMembership.objects.filter(board=obj, role='owner').first()
+
+                if current_owner:
+                    # Меняем роль текущего владельца на 'member'
+                    current_owner.role = 'member'
+                    current_owner.save()
+
+                # Получаем пользователя, который выбран в поле owner
+                new_owner = obj.owner  # Мы предполагаем, что obj.owner был обновлен в админке
+
+                # Проверяем, есть ли уже этот пользователь в BoardMembership
+                new_owner_membership = BoardMembership.objects.filter(board=obj, user=new_owner).first()
+
+                if new_owner_membership:
+                    # Если пользователь уже существует, обновляем его роль
+                    new_owner_membership.role = 'owner'
+                    new_owner_membership.save()
+                else:
+                    # Если пользователя нет в BoardMembership, создаем новую запись
+                    BoardMembership.objects.create(user=new_owner, board=obj, role='owner')
+
+                # Обновляем поле owner в самой доске
+                obj.owner = new_owner
+                obj.save()
 
 
 admin.site.register(Board, BoardAdmin)
+
+
+class BoardMembershipAdmin(admin.ModelAdmin):
+    list_display = [field.name for field in BoardMembership._meta.fields]
+    list_display_links = ['user']
+
+
+admin.site.register(BoardMembership, BoardMembershipAdmin)
 
 
 class ColumnAdmin(admin.ModelAdmin):
@@ -82,9 +117,35 @@ class CardInColumnAdmin(admin.ModelAdmin):
 admin.site.register(CardInColumn, CardInColumnAdmin)
 
 
+class UserProfileAdminForm(forms.ModelForm):
+    class Meta:
+        model = UserProfile
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Проверяем, если пользователь уже существует
+        if self.instance.pk:  # Если пользователь уже существует
+            user = self.instance  # Получаем текущего пользователя
+            # Фильтруем доски, к которым этот пользователь имеет доступ
+            self.fields['active_board'].queryset = Board.objects.filter(
+                id__in=BoardMembership.objects.filter(user=user).values('board_id')
+            )
+        else:
+            self.fields['active_board'].queryset = Board.objects.none()  # Для нового пользователя нет доступных досок
+
+    def clean_active_board(self):
+        active_board = self.cleaned_data.get('active_board')
+        # Проверка, что выбранная доска принадлежит текущему пользователю
+        if active_board and not BoardMembership.objects.filter(user=self.instance, board_id=active_board).exists():
+            raise forms.ValidationError("You do not have access to the selected board.")
+        return active_board
+
+
 @admin.register(UserProfile)
-class UserProfileAdmin(UserAdmin):
-    form = UserProfileChangeForm
+class UserProfileAdmin(admin.ModelAdmin):
+    form = UserProfileAdminForm
 
     fieldsets = (
         (None, {'fields': ('username', 'password')}),

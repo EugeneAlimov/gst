@@ -29,7 +29,6 @@ export default function ChipContainer({
   const color = chipColor[color_number];
 
   const editChipHangler = () => {
-
     dispatch(popUpToOpen(3));
 
     const targrtChipParameters = {

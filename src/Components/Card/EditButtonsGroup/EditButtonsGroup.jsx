@@ -72,7 +72,7 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
         margin: "10px",
       }}
     >
-      {!!data && popUpType !== 10 && <TaskCard {...data} />}
+      {!!data && popUpType !== 10 && <TaskCard {...data} allChips={chipsArr} inPopup={true} />}
       {popUpType === 0 ? (
         <Box sx={{ margin: "10px" }}>
           <Stack direction="column" justifyContent="center" alignItems="flex-start" spacing={1}>

@@ -91,3 +91,51 @@ export const refreshUser = createAsyncThunk("auth/refreshUser", async (_, thunkA
 // const authOperations = { register, logIn };
 
 // export default authOperations;
+
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+
+export const authApi = createApi({
+  reducerPath: "authApi",
+  baseQuery: fetchBaseQuery({
+    baseUrl: baseURL,
+    prepareHeaders: (headers) => {
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+      return headers;
+    },
+  }),
+  endpoints: (builder) => ({
+    login: builder.mutation({
+      query: (credentials) => ({
+        url: "token/",
+        method: "POST",
+        body: credentials,
+      }),
+    }),
+    logOut: builder.mutation({
+      query: (refresh) => ({
+        url: "token/blacklist/",
+        method: "POST",
+        body: { refresh },
+      }),
+    }),
+    refreshToken: builder.mutation({
+      query: (refresh) => ({
+        url: "token/refresh/",
+        method: "POST",
+        body: { refresh },
+      }),
+    }),
+    verifyToken: builder.mutation({
+      query: (token) => ({
+        url: "token/verify/",
+        method: "POST",
+        body: { token },
+      }),
+    }),
+  }),
+});
+
+export const { useLoginMutation, useLogOutMutation, useRefreshTokenMutation, useVerifyTokenMutation } = authApi;

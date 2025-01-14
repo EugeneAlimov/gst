@@ -5,12 +5,11 @@ export const columnsApi = createApi({
   reducerPath: "columnsApi",
   tagTypes: ["columns"],
   baseQuery: fetchBaseQuery({
-    // baseUrl: "http://127.0.0.1:8000/api/v1",
     baseUrl: `${baseURL}`,
     prepareHeaders: (headers, { getState }) => {
-      const { accessToken } = getState().auth;
-      if (accessToken) {
-        headers.set("Authorization", `Bearer ${accessToken}`);
+      const token = getState().auth?.accessToken || localStorage.getItem("access_token");
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
       }
       return headers;
     },
@@ -45,7 +44,7 @@ export const columnsApi = createApi({
       invalidatesTags: [{ type: "columns", id: "LIST" }],
     }),
     UpdateColumnsPositions: builder.mutation({
-      query: ({id, columns }) => ({
+      query: ({ id, columns }) => ({
         url: `/columns-on-board/${id}/`,
         method: "PATCH",
         body: { columns },
@@ -53,7 +52,7 @@ export const columnsApi = createApi({
       invalidatesTags: [{ type: "columns", id: "LIST" }],
     }),
     UpdateColumnDetails: builder.mutation({
-      query: ({id, field }) => ({
+      query: ({ id, field }) => ({
         url: `/column/${id}/`,
         method: "PATCH",
         body: { ...field },
@@ -68,5 +67,5 @@ export const {
   useGetColumnDetailMutation,
   useCreateNewColumnMutation,
   useUpdateColumnsPositionsMutation,
-  useUpdateColumnDetailsMutation
+  useUpdateColumnDetailsMutation,
 } = columnsApi;

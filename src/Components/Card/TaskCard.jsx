@@ -71,10 +71,11 @@ export default function TaskCard({
   status,
   index,
   chips,
+  inPopup,
+  allChips,
 }) {
-  // const { data: allChips } = useGetAllChipsQuery();
   const [cardTextUpdater] = useUpdateCardDetailMutation();
-  const dispatch = useDispatch()
+  const dispatch = useDispatch();
   const cardRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -89,20 +90,15 @@ export default function TaskCard({
   const [cardText, setCardText] = useState(text);
   const [cardTextBuffer, setCardTextBuffer] = useState("");
 
-  const allChips = useSelector((state) => state.chipsApi.queries["getAllChips(undefined)"]?.data);
-  const cardMutation = useSelector((state) => state.cardsApi.mutations)
-console.log('cardMutation ', cardMutation);
-
   useEffect(() => {
     if (!!!allChips) return;
     const cardChips = chips.map((chip) => {
-      const newChip = allChips.find(el => el.id === chip )
-      return newChip
+      const newChip = allChips.find((el) => el.id === chip);
+      return newChip;
     });
-    console.log('fesc  dvd d ');
-    
+
     setChipsArr(cardChips);
-  }, [allChips]);
+  }, [allChips, chips]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -176,10 +172,10 @@ console.log('cardMutation ', cardMutation);
   }, [setPreview, setClosestEdge, setCardDragging]);
 
   const popClose = () => {
-    setOpenPop(false)
-    dispatch(popUpToOpen(0))
-  }
-  
+    setOpenPop(false);
+    dispatch(popUpToOpen(0));
+  };
+
   return (
     <Box
       ref={cardRef}
@@ -194,7 +190,7 @@ console.log('cardMutation ', cardMutation);
         onMouseOver={() => setShowEditIcon(true)}
         onMouseOut={() => setShowEditIcon(false)}
       >
-        {showEditIcon && (
+        {showEditIcon && !inPopup && (
           <Box sx={style.boxEditOutlinedIconStyle}>
             <IconButton onClick={() => setOpenPop(true)} aria-label="edit">
               <EditOutlinedIcon />
@@ -276,7 +272,13 @@ console.log('cardMutation ', cardMutation);
           </IconButton>
         </DialogTitle>
         <DialogContent sx={style.dialogContent}>
-          {<EditButtonsGroup chipsArr={chipsArr} cardId={id} p={{ date_time_finish, date_time_start, status }} />}
+          {
+            <EditButtonsGroup
+              chipsArr={chipsArr}
+              cardId={id}
+              p={{ date_time_finish, date_time_start, status }}
+            />
+          }
         </DialogContent>
       </Dialog>
       {closestEdge && <DropIndicator height={placeholderHeight} />}

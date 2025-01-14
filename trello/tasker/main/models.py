@@ -2,24 +2,13 @@ from django.contrib.auth.models import AbstractUser, PermissionsMixin
 from django.db import models
 
 
-# class UserProfile(AbstractUser, PermissionsMixin):
-#     active_board = models.IntegerField(blank=True, null=True, default=1, verbose_name='Активная доска')
-#     roles = models.IntegerField(blank=True, null=True, default=3, verbose_name='Роль')
-#     photo = models.ImageField(blank=True, null=True, default=None, verbose_name='Фото пользователя')
-#     user_information = models.CharField(max_length=1000, blank=True, null=True, default=None,
-#                                         verbose_name='Информация о пользователе')
-#
-#     def __str__(self):
-#         return "%s" % self.username
-#
-#     class Meta:
-#         verbose_name = 'Профиль пользователя'
-#         verbose_name_plural = 'Профили пользователей'
-
 class UserProfile(AbstractUser, PermissionsMixin):
-    active_board = models.IntegerField(blank=True, null=True, default=1, verbose_name='Активная доска')
-    # Удаляем поле roles, если роль теперь хранится в BoardMembership
-    # roles = models.IntegerField(blank=True, null=True, default=3, verbose_name='Роль')
+    active_board = models.ForeignKey(
+        'Board',  # Теперь поле связывается с моделью Board
+        on_delete=models.SET_NULL,  # Удаление пользователя не будет удалять доску
+        null=True, blank=True,  # Поле может быть пустым
+        verbose_name='Активная доска'
+    )
     photo = models.ImageField(blank=True, null=True, default=None, verbose_name='Фото пользователя')
     user_information = models.CharField(
         max_length=1000, blank=True, null=True, default=None,
@@ -36,7 +25,6 @@ class UserProfile(AbstractUser, PermissionsMixin):
 
 class Board(models.Model):
     name = models.CharField(max_length=100, blank=True, null=True, default=None, verbose_name='Название')
-    # is_active = models.BooleanField(blank=True, null=True, default=False, verbose_name='Активна')
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
     # Опциональное поле для указания владельца доски
@@ -63,24 +51,10 @@ class BoardMembership(models.Model):
         ('guest', 'Гость'),
     )
 
-    user = models.ForeignKey(
-        UserProfile,
-        on_delete=models.CASCADE,
-        related_name='board_memberships',
-        verbose_name='Пользователь'
-    )
-    board = models.ForeignKey(
-        Board,
-        on_delete=models.CASCADE,
-        related_name='board_memberships',
-        verbose_name='Доска'
-    )
-    role = models.CharField(
-        max_length=50,
-        choices=ROLE_CHOICES,
-        default='member',
-        verbose_name='Роль'
-    )
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='board_memberships',
+                             verbose_name='Пользователь')
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='board_memberships', verbose_name='Доска')
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='member', verbose_name='Роль')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата добавления')
 
     class Meta:
@@ -90,21 +64,6 @@ class BoardMembership(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.board.name} ({self.role})"
-
-
-# class Board(models.Model):
-#     user = models.ManyToManyField(UserProfile, blank=True, default=None, verbose_name='Пользователь')
-#     created = models.DateTimeField(auto_now_add=True)
-#     updated = models.DateTimeField(auto_now=True)
-#     name = models.CharField(max_length=100, blank=True, null=True, default=None, verbose_name='Название')
-#     # is_active = models.BooleanField(blank=True, null=True, default=False, verbose_name='Активна')
-#
-#     def __str__(self):
-#         return "%s" % self.name
-#
-#     class Meta:
-#         verbose_name = 'Доска'
-#         verbose_name_plural = 'Доски'
 
 
 class Column(models.Model):
@@ -211,9 +170,6 @@ class Comment(models.Model):
     class Meta:
         verbose_name = 'Comment'
         verbose_name_plural = 'Comment'
-
-
-search_fields = ['username', 'email', 'phone_number', 'address']
 
 
 class ChecklistItem(models.Model):

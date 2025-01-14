@@ -4,6 +4,10 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
+from rest_framework import permissions
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
 from .serializers import *
 
 
@@ -11,6 +15,10 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        # Возвращаем только текущего аутентифицированного пользователя
+        return UserProfile.objects.filter(id=self.request.user.id)
 
 
 class UserBoardsViewSet(viewsets.ReadOnlyModelViewSet):
@@ -29,13 +37,36 @@ class UserBoardsViewSet(viewsets.ReadOnlyModelViewSet):
 class BoardMembershipViewSet(viewsets.ModelViewSet):
     queryset = BoardMembership.objects.all()
     serializer_class = BoardMembershipSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         # Фильтрация по доске, если это необходимо
         board_id = self.request.query_params.get('board', None)
         if board_id:
+            print('BoardMembership 1', BoardMembership)
             return BoardMembership.objects.filter(board_id=board_id)
+        print('BoardMembership 2', BoardMembership)
         return BoardMembership.objects.all()
+
+
+class UpdateActiveBoardView(APIView):
+    permission_classes = [IsAuthenticated]  # Убедимся, что только авторизованные пользователи могут изменять доску
+
+    def patch(self, request, *args, **kwargs):
+        # Получаем текущего пользователя
+        user = request.user
+
+        # Получаем текущий профиль пользователя
+        user_profile = UserProfile.objects.get(id=user.id)
+
+        # Сериализуем данные и обновляем
+        serializer = ActiveBoardSerializer(user_profile, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            # Сохраняем изменения
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class BoardsViewSet(viewsets.ModelViewSet):
@@ -119,6 +150,41 @@ class ColumnViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_200_OK)
 
 
+# class ColumnsOnBoardViewSet(viewsets.ModelViewSet):
+#     queryset = Column.objects.all()
+#     serializer_class = ColumnSerializer
+#     permission_classes = (IsAuthenticated,)
+#
+#     def partial_update(self, request, *args, **kwargs):
+#         """"Обновить положение колонок на доске.
+#             передается id доски чтобы отфильтровать колонки на этой доске"""
+#         columns = request.data.get('columns')
+#         print('columns', columns)
+#         pk = kwargs.get('pk', None)
+#         print('request.data columns ', request.data)
+#         if not pk:
+#             return Response({"error": "Method PUT not allowed: no pk"})
+#
+#         columns_queryset = Column.objects.filter(board=pk)
+#         print('columns_queryset ', columns_queryset)
+#
+#         if columns_queryset.exists():
+#             for c_s in columns_queryset:
+#                 c_s_id = c_s.id
+#
+#                 for c in columns:
+#                     if c['id'] == c_s_id:
+#                         index = c['index']
+#                         c_s.position_on_board = index
+#                     c_s.save()
+#             try:
+#                 instance = Column.objects.filter(board=pk)
+#                 serializer = BoardSerializer(instance)
+#
+#                 return Response(serializer.data)
+#             except Board.DoesNotExist:
+#                 return Response({"error": "Object not found"}, status=404)
+
 class ColumnsOnBoardViewSet(viewsets.ModelViewSet):
     queryset = Column.objects.all()
     serializer_class = ColumnSerializer
@@ -129,7 +195,7 @@ class ColumnsOnBoardViewSet(viewsets.ModelViewSet):
             передается id доски чтобы отфильтровать колонки на этой доске"""
         columns = request.data.get('columns')
         pk = kwargs.get('pk', None)
-        print('request.data columns ', request.data)
+
         if not pk:
             return Response({"error": "Method PUT not allowed: no pk"})
 
@@ -144,15 +210,13 @@ class ColumnsOnBoardViewSet(viewsets.ModelViewSet):
                         index = c['index']
                         c_s.position_on_board = index
                     c_s.save()
-            try:
-                instance = Column.objects.filter(board=pk)
-                serializer = BoardSerializer(instance)
 
-                return Response(serializer.data)
-            except Board.DoesNotExist:
-                return Response({"error": "Object not found"}, status=404)
+            # Сериализуем обновленные колонки
+            serializer = ColumnSerializer(columns_queryset, many=True)
+            return Response(serializer.data)
+        return Response({"error": "No columns found for this board"}, status=status.HTTP_404_NOT_FOUND)
 
-
+    
 class CardInColumnViewSet(viewsets.ModelViewSet):
     queryset = CardInColumn.objects.all()
     serializer_class = CardInColumnSerializer
@@ -243,7 +307,45 @@ class CardViewSet(viewsets.ModelViewSet):
         self.perform_create(serializer)
 
         headers = self.get_success_headers(serializer.data)
+
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def partial_update(self, request, *args, **kwargs):
+        pk = kwargs.get('pk', None)
+        if not pk:
+            return Response({"error": "Method PUT not allowed: no pk"})
+
+        # Получаем объект карточки
+        card = Card.objects.filter(id=pk).first()
+        if not card:
+            return Response({"error": "Card not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Сначала обновляем другие поля карточки
+        if 'field' in request.data:
+            for i in request.data['field']:
+                field = i
+                value = request.data['field'][i]
+                if field != 'chips':  # Чтобы не обновить chips повторно
+                    Card.objects.update_or_create(
+                        id=pk,
+                        defaults={field: value}
+                    )
+
+        # Обновляем связь ManyToMany для chips
+        chips = request.data.get('chips', None)
+        if chips is not None:
+            # Получаем чипы по переданным ID
+            try:
+                chip_objects = Chip.objects.filter(id__in=chips)
+                card.chips.set(chip_objects)  # Обновляем связь
+            except Chip.DoesNotExist:
+                return Response({"error": "One or more chips not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+            card.save()  # Сохраняем изменения
+
+        # Возвращаем обновленные данные
+        serializer = CardSerializer(card)
+        return Response(serializer.data)
 
 
 class ChipViewSet(viewsets.ModelViewSet):

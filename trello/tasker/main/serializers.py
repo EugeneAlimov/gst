@@ -14,6 +14,24 @@ class BoardSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class ActiveBoardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['active_board']  # Мы будем обновлять только это поле
+
+        def update(self, instance, validated_data):
+            # Обновление только активной доски для текущего пользователя
+            active_board = validated_data.get('active_board')
+
+            # Проверяем, что выбранная доска существует
+            if not Board.objects.filter(id=active_board).exists():
+                raise serializers.ValidationError("The selected board does not exist.")
+
+            instance.active_board = active_board
+            instance.save()
+            return instance
+
+
 class CardInColumnSerializer(serializers.ModelSerializer):
     card_id = serializers.IntegerField()
     column_id = serializers.IntegerField()
@@ -37,10 +55,6 @@ class CardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Card
-        # fields = ['id', 'name', 'header_color', 'text', 'status', 'comments_how_many', 'checklist_how_many',
-        #           'date_time_start', 'date_time_finish', 'date_time_reminder', 'created', 'updated', 'is_subscribed',
-        #           'in_process', 'is_archived', 'is_have_description', 'header_image', 'card_in_columns', 'column_id',
-        #           'position_in_column']
         fields = '__all__'
 
     def get_column_id(self, obj):

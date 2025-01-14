@@ -8,7 +8,8 @@ export const checklistApi = createApi({
     // baseUrl: "http://127.0.0.1:8000/api/v1",
     baseUrl: `${baseURL}`,
     prepareHeaders: (headers, { getState }) => {
-      const { accessToken } = getState().auth;
+      // const { accessToken } = getState().auth;
+      const accessToken = localStorage.getItem("access_token");
       if (accessToken) {
         headers.set("Authorization", `Bearer ${accessToken}`);
       }
@@ -17,18 +18,19 @@ export const checklistApi = createApi({
   }),
   endpoints: (builder) => ({
     getChecklist: builder.query({
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({ type: "checklist", id })),
+              { type: "checklist", id: "LIST" },
+            ]
+          : [{ type: "checklist", id: "LIST" }],
       query: (id) => ({
         url: `/checklist-item/`,
         params: {
           card: id,
         },
       }),
-      providesTags: (result) => result
-          ? [
-              ...result.map(({ id }) => ({ type: 'checklist', id })),
-              { type: 'checklist', id: 'LIST' },
-            ]
-          : [{ type: 'checklist', id: 'LIST' }],
     }),
     getColumnDetail: builder.mutation({
       query: (id) => ({

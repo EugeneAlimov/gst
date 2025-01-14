@@ -8,7 +8,8 @@ export const dateTimeApi = createApi({
     // baseUrl: "http://127.0.0.1:8000/api/v1",
     baseUrl: `${baseURL}`,
     prepareHeaders: (headers, { getState }) => {
-      const { accessToken } = getState().auth;
+      // const { accessToken } = getState().auth;
+      const accessToken = localStorage.getItem("access_token");
       if (accessToken) {
         headers.set("Authorization", `Bearer ${accessToken}`);
       }
@@ -16,6 +17,10 @@ export const dateTimeApi = createApi({
     },
   }),
   endpoints: (builder) => ({
+    providesTags: (result) =>
+      result
+        ? [...result.map(({ id }) => ({ type: "chips", id })), { type: "chips", id: "LIST" }]
+        : [{ type: "chips", id: "LIST" }],
     getChips: builder.query({
       query: (id) => ({
         url: `/chip/`,
@@ -29,11 +34,6 @@ export const dateTimeApi = createApi({
       query: () => ({
         url: `/chip/`,
       }),
-
-      providesTags: (result) =>
-        result
-          ? [...result.map(({ id }) => ({ type: "chips", id })), { type: "chips", id: "LIST" }]
-          : [{ type: "chips", id: "LIST" }],
     }),
     createNewChip: builder.mutation({
       query: (newChip) => ({

@@ -2,17 +2,14 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { baseURL } from "../axiosDefaults";
 
 export const cardsApi = createApi({
-  refetchOnReconnect: true,
-  refetchOnMountOrArgChange: true,
   reducerPath: "cardsApi",
   tagTypes: ["cards"],
   baseQuery: fetchBaseQuery({
-    // baseUrl: "http://127.0.0.1:8000/api/v1",
     baseUrl: `${baseURL}`,
     prepareHeaders: (headers, { getState }) => {
-      const { accessToken } = getState().auth;
-      if (accessToken) {
-        headers.set("Authorization", `Bearer ${accessToken}`);
+      const token = getState().auth?.accessToken || localStorage.getItem("access_token");
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
       }
       return headers;
     },
@@ -46,15 +43,15 @@ export const cardsApi = createApi({
       providesTags: ["cards"],
     }),
     updateCardDetail: builder.mutation({
-      query: ({ cardId, ...patchData }) => ({
-        url: `/card/${cardId}/`,
+      query: ({ id, ...patchData }) => ({
+        url: `/card/${id}/`,
         method: "PATCH",
         body: { ...patchData },
       }),
       invalidatesTags: [{ type: "cards", id: "LIST" }],
     }),
     updateCardInColumn: builder.mutation({
-      query: ({target_column_id, cards }) => ({
+      query: ({ target_column_id, cards }) => ({
         url: `/card/update-positions/`,
         method: "POST",
         body: { target_column_id, cards },

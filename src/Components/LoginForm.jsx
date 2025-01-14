@@ -13,28 +13,53 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import Button from "@mui/material/Button";
 
-//import auth operations
-import { logIn } from "../Redux/auth/auth-operations";
-
-//import states from Redux
+import useAuth from "../libs/useAuth";
+import { setUserState } from "../Redux/auth/auth-slice";
+import { wrapperLogout } from "../libs/wrapperLogOut";
 
 export default function InputAdornments() {
   const [showPassword, setShowPassword] = useState(false);
+  const { loginUser, refreshAccessToken, logoutUser } = useAuth();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
 
   const dispatch = useDispatch();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await loginUser(username, password);
+      setError(null);
+
+      dispatch(setUserState({ username, password }));
+      // перенаправление на защищенную страницу
+    } catch (err) {
+      setError("Ошибка входа. Проверьте логин и пароль.");
+    }
+  };
+
+  const handleProtectedAction = async () => {
+    try {
+      const accessToken = localStorage.getItem("access_token");
+
+      // Проверяем, если токен истек, то обновляем его
+      if (accessToken) {
+        await refreshAccessToken();
+      }
+      // Здесь вы можете сделать защищенный запрос
+    } catch (error) {
+      console.error("Не удалось выполнить защищенное действие:", error);
+      setError("Сессия истекла, пожалуйста, войдите снова.");
+      wrapperLogout(dispatch, logoutUser);
+    }
+  };
 
   const handleClickShowPassword = () => setShowPassword((show) => !show);
 
   const handleMouseDownPassword = (event) => {
     event.preventDefault();
-  };
-
-  const loginSubmit = (event) => {
-    event.preventDefault();
-
-    dispatch(logIn({ username, password }));
   };
 
   return (
@@ -51,7 +76,7 @@ export default function InputAdornments() {
         boxShadow: "10",
       }}
     >
-      <form onSubmit={loginSubmit}>
+      <form onSubmit={handleSubmit}>
         <Box
           sx={{ display: "flex", flexDirection: "row", flexWrap: "wrap", justifyContent: "center" }}
         >
@@ -100,6 +125,9 @@ export default function InputAdornments() {
           </Button>
         </Box>
       </form>
+      {error && <p>{error}</p>}
+      <button onClick={() => wrapperLogout(dispatch, logoutUser)}>Выйти</button>
+      <button onClick={handleProtectedAction}>Выполнить защищенное действие</button>
     </Paper>
   );
 }

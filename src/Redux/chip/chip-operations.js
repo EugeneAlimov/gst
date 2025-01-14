@@ -5,17 +5,20 @@ export const chipsApi = createApi({
   reducerPath: "chipsApi",
   tagTypes: ["chips"],
   baseQuery: fetchBaseQuery({
-    // baseUrl: "http://127.0.0.1:8000/api/v1",
     baseUrl: `${baseURL}`,
     prepareHeaders: (headers, { getState }) => {
-      const { accessToken } = getState().auth;
-      if (accessToken) {
-        headers.set("Authorization", `Bearer ${accessToken}`);
+      const token = getState().auth?.accessToken || localStorage.getItem("access_token");
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
       }
       return headers;
     },
   }),
   endpoints: (builder) => ({
+    // providesTags: (result) =>
+    //   result
+    //     ? [...result.map(({ id }) => ({ type: "chips", id })), { type: "chips", id: "LIST" }]
+    //     : [{ type: "chips", id: "LIST" }],
     getChips: builder.query({
       query: (id) => ({
         url: `/chip/`,
@@ -23,17 +26,16 @@ export const chipsApi = createApi({
           card: id,
         },
       }),
-      providesTags: ["chips"],
+      providesTags: (result) =>
+        result
+          ? [...result.map(({ id }) => ({ type: "chips", id })), { type: "chips", id: "LIST" }]
+          : [{ type: "chips", id: "LIST" }],
+      // providesTags: ["chips"],
     }),
     getAllChips: builder.query({
       query: () => ({
         url: `/chip/`,
       }),
-
-      providesTags: (result) =>
-        result
-          ? [...result.map(({ id }) => ({ type: "chips", id })), { type: "chips", id: "LIST" }]
-          : [{ type: "chips", id: "LIST" }],
     }),
     createNewChip: builder.mutation({
       query: (newChip) => ({

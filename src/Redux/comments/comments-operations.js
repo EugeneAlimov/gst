@@ -8,7 +8,8 @@ export const commentsApi = createApi({
     // baseUrl: "http://127.0.0.1:8000/api/v1",
     baseUrl: `${baseURL}`,
     prepareHeaders: (headers, { getState }) => {
-      const { accessToken } = getState().auth;
+      // const { accessToken } = getState().auth;
+      const accessToken = localStorage.getItem("access_token");
       if (accessToken) {
         headers.set("Authorization", `Bearer ${accessToken}`);
       }
@@ -17,18 +18,16 @@ export const commentsApi = createApi({
   }),
   endpoints: (builder) => ({
     getComments: builder.query({
+      providesTags: (result) =>
+        result
+          ? [...result.map(({ id }) => ({ type: "comment", id })), { type: "comment", id: "LIST" }]
+          : [{ type: "comment", id: "LIST" }],
       query: (id) => ({
         url: `/comment/`,
         params: {
           card: id,
         },
       }),
-      providesTags: (result) => result
-          ? [
-              ...result.map(({ id }) => ({ type: 'comment', id })),
-              { type: 'comment', id: 'LIST' },
-            ]
-          : [{ type: 'comment', id: 'LIST' }],
     }),
     getColumnDetail: builder.mutation({
       query: (id) => ({

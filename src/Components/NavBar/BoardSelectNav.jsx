@@ -12,18 +12,13 @@ import { styled } from "@mui/material/styles";
 
 //import UI components
 import GreyButtonCreateColumn from "../UI/GreyButtonCreateColumn";
-//import states from Redux
-import { boardData } from "../../Redux/board/board-slice";
 
-// import static
-import {
-  // useGetBoardsQuery,
-  useGetActiveBoardMutation,
-  useGetUserBoardsQuery,
-} from "../../Redux/board/board-operations";
+//import static
+import { useGetUserBoardsQuery } from "../../Redux/board/board-operations";
 import { getActiveBoardId } from "../../Redux/board/board-slice";
-import { useCreateNewColumnMutation } from "../../Redux/columns/column-operations";
+import { columnsApi, useCreateNewColumnMutation } from "../../Redux/columns/column-operations";
 import { columnData } from "../../Redux/columns/column-slice";
+import { useGetUsersQuery, useUpdateActiveBoardMutation } from "../../Redux/user/user-operations";
 
 const BoardSelect = styled(Select)(() => ({
   fieldset: {
@@ -33,30 +28,42 @@ const BoardSelect = styled(Select)(() => ({
 }));
 
 export default function BoardSelectNav({ isLoggedIn }) {
-  const boardDataFromState = useSelector(boardData);
-  const id = boardDataFromState.id;
-  const columnsLength = useSelector(columnData);
-  const [currentBoard, seCurrentBoard] = useState(id);
+  const activeBoard = useSelector((state) => state.userApi.queries["getUsers(undefined)"]?.data);
 
-  const [updateBoardDetail] = useGetActiveBoardMutation();
-  const { data: userBoards, refetch } = useGetUserBoardsQuery();
+  const columnsLength = useSelector(columnData);
+  const [currentBoard, setCurrentBoard] = useState(null);
+
+  const [updateBoardDetail] = useUpdateActiveBoardMutation();
+  const { data: userBoards, refetch: userBoardsRefetch } = useGetUserBoardsQuery();
+  const { refetch: userRefetch } = useGetUsersQuery();
 
   const [columnCreator] = useCreateNewColumnMutation();
 
   const dispatch = useDispatch();
 
   useEffect(() => {
-    if (isLoggedIn) refetch();
-  }, [isLoggedIn, refetch]);
+    if (!activeBoard) return;
+
+    setCurrentBoard(activeBoard[0].active_board);
+  }, [activeBoard]);
+
+  useEffect(() => {
+    if (isLoggedIn) userBoardsRefetch();
+  }, [isLoggedIn, userBoardsRefetch]);
 
   const getBoard = async (event) => {
     try {
-      
       const tempCurrentBoard = event.target.value;
 
       dispatch(getActiveBoardId(tempCurrentBoard));
-      seCurrentBoard(tempCurrentBoard);
+      setCurrentBoard(tempCurrentBoard);
+
       await updateBoardDetail(tempCurrentBoard);
+    } catch (error) {
+      console.log(error);
+    }
+    try {
+      await userRefetch();
     } catch (error) {
       console.log(error);
     }
@@ -64,12 +71,17 @@ export default function BoardSelectNav({ isLoggedIn }) {
 
   const newColumnCreater = async () => {
     const column = {
-      board: id,
+      board: currentBoard,
       name: "",
       position_on_board: columnsLength.columnsLength,
     };
     try {
-      await columnCreator(column);
+      const newColumn = await columnCreator(column).unwrap(); //При помощи unwrap() мы распаковываем ответ от сервера в переменную newColumn
+      dispatch(
+        columnsApi.util.updateQueryData("getColumns", activeBoard[0].active_board, (draft) => {
+          draft.push(newColumn); // Добавляем новую колонку в кэш из распакованного ответа
+        })
+      );
     } catch (error) {
       console.log(error);
     }
@@ -90,7 +102,6 @@ export default function BoardSelectNav({ isLoggedIn }) {
           Рабочая доска
         </InputLabel>
         <BoardSelect
-          defaultValue={''}
           sx={{ color: "#fff" }}
           labelId="board-simple-select-helper-label"
           id="board-simple-select-helper"
@@ -101,7 +112,6 @@ export default function BoardSelectNav({ isLoggedIn }) {
           {!!userBoards &&
             userBoards.map((board) => {
               const { id, name } = board;
-
               return (
                 <MenuItem key={id} value={id}>
                   {name}
@@ -110,11 +120,7 @@ export default function BoardSelectNav({ isLoggedIn }) {
             })}
         </BoardSelect>
       </FormControl>
-      <GreyButtonCreateColumn
-        // variant="contained"
-        variant="outlined"
-        onClick={newColumnCreater}
-      >
+      <GreyButtonCreateColumn variant="outlined" onClick={newColumnCreater}>
         {"Новая колонка"}
       </GreyButtonCreateColumn>
     </Box>

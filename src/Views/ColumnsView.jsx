@@ -18,7 +18,6 @@ import {
   useGetColumnsQuery,
   useUpdateColumnsPositionsMutation,
 } from "../Redux/columns/column-operations";
-import { boardData } from "../Redux/board/board-slice";
 
 // import components
 import Column from "../Components/Column/Column";
@@ -28,12 +27,12 @@ import useWindowDimensions from "../libs/useWindowDimentions";
 import { columnDragStart, columnOnDrop } from "../libs/libs";
 import { useGetAllChipsQuery } from "../Redux/chip/chip-operations";
 
-export default function ColumnsView({ boardHeight, activeBoardId }) {
-  const boardDataFromState = useSelector(boardData);
-  const acitiveBoardId = boardDataFromState.id;
+export default function ColumnsView({ allChips, boardHeight }) {
+  const activeBoardId = useSelector(
+    (state) => state.userApi.queries["getUsers(undefined)"]?.data[0].active_board
+  );
 
-  const { data: COLUMNS } = useGetColumnsQuery(acitiveBoardId);
-  const { data: allChips } = useGetAllChipsQuery();
+  const { data: COLUMNS } = useGetColumnsQuery(activeBoardId);
 
   const [columnPositionUpdate] = useUpdateColumnsPositionsMutation();
 
@@ -58,15 +57,6 @@ export default function ColumnsView({ boardHeight, activeBoardId }) {
   }, [COLUMNS]);
 
   useEffect(() => {
-    if (!!!allChips) return;
-    // console.log('allChips', allChips);
-    
-    // const cardChips = allChips.filter((chip) => chip.card.includes(id));
-    // setChipsArr(cardChips);
-  }, [allChips]);
-
-
-  useEffect(() => {
     const element = ref.current;
     return combine(
       monitorForElements({
@@ -85,7 +75,7 @@ export default function ColumnsView({ boardHeight, activeBoardId }) {
               columns,
               setColumns,
               columnPositionUpdate,
-              acitiveBoardId,
+              activeBoardId,
               storedColumn
             );
         },
@@ -114,6 +104,7 @@ export default function ColumnsView({ boardHeight, activeBoardId }) {
               columnOnDrop={columnOnDrop}
               activeBoardId={activeBoardId}
               boardHeight={boardHeight}
+              allChips={allChips}
             />
           );
         })}

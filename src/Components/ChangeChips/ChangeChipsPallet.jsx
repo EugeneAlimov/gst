@@ -21,7 +21,7 @@ import ChipContainer from "./ChipContainer";
 // import constants
 // import { chipColor } from "../../constants/colorsConst";
 import { useGetAllChipsQuery } from "../../Redux/chip/chip-operations";
-import { useUpdateCardDetailMutation } from "../../Redux/cards/cards-operations";
+import { cardsApi, useUpdateCardDetailMutation } from "../../Redux/cards/cards-operations";
 
 export default function ChangeChipsPallet({ cardId, chipsArr }) {
   const { data: chips } = useGetAllChipsQuery();
@@ -32,9 +32,6 @@ export default function ChangeChipsPallet({ cardId, chipsArr }) {
   const [buttonsState, setButtonsState] = useState(1);
   const [chipList, setChipList] = useState([]);
   const [searchText, setSearchText] = useState("");
-
-// console.log('chips ', chips);
-// console.log('chipsArr ', chipsArr);
 
   useEffect(() => {
     let arr = JSON.parse(JSON.stringify(chips));
@@ -70,37 +67,94 @@ export default function ChangeChipsPallet({ cardId, chipsArr }) {
     setChipList(newArr);
   }, [buttonsState, chipsArr, chips, searchText]);
 
-  const chipRelateToCardUpdate = async (chipId) => {
-    let arr = JSON.parse(JSON.stringify(chipsArr));
-    let newArr = [];
+  // const chipRelateToCardUpdate = async (chipId) => {
+  //   let arr = JSON.parse(JSON.stringify(chipsArr));
+  //   let newArr = [];
 
+  //   chipList.forEach((element) => {
+  //     if (element.id === chipId) {
+  //       if (element.checked) {
+  //         newArr = [...arr.filter((el) => el.id !== chipId)];
+  //       }
+  //       if (!element.checked) {
+  //         arr.push(chips[chips.findIndex((el) => el.id === chipId)]);
+  //         newArr = [...arr];
+  //       }
+  //     }
+  //   });
+
+  //   const finalArr = newArr.map((el) => {
+  //     return el.id;
+  //   });
+
+  //   const chipsObj = { id: cardId, chips: finalArr };
+  //     dispatch(
+  //       cardsApi.util.updateQueryData("getCards", cardId, (draft) => {
+  //         const card = draft.find((c) => c.id === cardId);
+  //         if (card) {
+  //           card.chips = finalArr; // Обновляем только chips
+  //         }
+  //       })
+  //     );
+  //   try {
+  //     await updateCard(chipsObj)
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  // };
+
+  const chipRelateToCardUpdate = async (chipId) => {
+    // Создаем копию массива chipsArr
+    let updatedChipsArr = [...chipsArr];
+  
+    // Ищем элемент в chipList и обновляем массив
     chipList.forEach((element) => {
       if (element.id === chipId) {
-        console.log("elemnt ", element);
-
         if (element.checked) {
-          newArr = [...arr.filter((el) => el.id !== chipId)];
-        }
-        if (!element.checked) {
-          arr.push(chips[chips.findIndex((el) => el.id === chipId)]);
-          newArr = [...arr];
+          // Убираем chip из массива
+          updatedChipsArr = updatedChipsArr.filter((el) => el.id !== chipId);
+        } else {
+          // Добавляем chip в массив
+          const chipToAdd = chips.find((el) => el.id === chipId);
+          if (chipToAdd) updatedChipsArr.push(chipToAdd);
         }
       }
     });
-
-    const finalArr = newArr.map((el) => {
-      return el.id;
-    });
-
-    const chipsObj = { cardId, chips: finalArr };
-
+  
+    // Преобразуем массив в массив ID
+    const finalChipsIds = updatedChipsArr.map((el) => el.id);
+  
+    // Формируем объект для обновления
+    const chipsObj = { id: cardId, chips: finalChipsIds };
+  
+    // Локально обновляем кэш
+    dispatch(
+      cardsApi.util.updateQueryData("getCards", undefined, (draft) => {
+        const card = draft.find((c) => c.id === cardId);
+        if (card) {
+          card.chips = finalChipsIds; // Обновляем только поле chips
+        }
+      })
+    );
+  
+    // Отправляем данные на сервер
     try {
-      updateCard(chipsObj);
+      await updateCard(chipsObj);
     } catch (error) {
-      console.log(error);
+      console.error("Ошибка обновления карты:", error);
+  
+      // Если запрос завершился ошибкой, можно откатить изменения в кэше
+      dispatch(
+        cardsApi.util.updateQueryData("getCards", undefined, (draft) => {
+          const card = draft.find((c) => c.id === cardId);
+          if (card) {
+            card.chips = chipsArr.map((el) => el.id); // Восстанавливаем изначальный массив
+          }
+        })
+      );
     }
   };
-
+  
   return (
     <Card
       sx={{

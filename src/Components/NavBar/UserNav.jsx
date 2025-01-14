@@ -10,9 +10,11 @@ import Avatar from "@mui/material/Avatar";
 import Menu from "@mui/material/Menu";
 import IconButton from "@mui/material/IconButton";
 
+// import auth
+import { wrapperLogout } from "../../libs/wrapperLogOut";
+import useAuth from "../../libs/useAuth";
+
 import { useGetUsersQuery } from "../../Redux/user/user-operations";
-import { logOut } from "../../Redux/auth/auth-operations";
-import { setActiveBoardToDefault } from "../../Redux/board/board-slice";
 
 export default function UserNav({ userName }) {
   const dispatch = useDispatch();
@@ -20,12 +22,13 @@ export default function UserNav({ userName }) {
   const { data: users } = useGetUsersQuery();
   const [anchorElUser, setAnchorElUser] = useState(null);
   const [user, setUser] = useState({});
+  const { logoutUser } = useAuth();
 
   useEffect(() => {
     if (!users) return;
-    const w = users.find((element) => element.username === userName);
+    const u = users[0];
 
-    setUser(w);
+    setUser(u);
   }, [userName, users]);
 
   const { username: name, photo } = user;
@@ -37,13 +40,12 @@ export default function UserNav({ userName }) {
     setAnchorElUser(null);
   };
 
-  const handleClose = () => {
+  const handleLogout = () => {
     setAnchorElUser(null);
-    dispatch(logOut());
-    dispatch(setActiveBoardToDefault())
+    wrapperLogout(dispatch, logoutUser);
   };
-  
-  const avatarSimbol = userName.substring(0, 1).toUpperCase()
+
+  const avatarSimbol = userName.substring(0, 1).toUpperCase();
 
   return (
     <>
@@ -72,7 +74,7 @@ export default function UserNav({ userName }) {
           <MenuItem key={1} onClick={handleCloseUserMenu}>
             <Typography textAlign="center">{"Настройки профиля"}</Typography>
           </MenuItem>
-          <MenuItem key={2} onClick={handleClose}>
+          <MenuItem key={2} onClick={handleLogout}>
             <Typography textAlign="center">{"Выйти"}</Typography>
           </MenuItem>
         </Menu>

@@ -15,7 +15,8 @@ import authReducer from "./auth/auth-slice";
 import boardReducer from "./board/board-slice";
 import columnReducer from "./columns/column-slice";
 import chipReducer from "./chip/chip-slice";
-import cardReducer from "./cards/card-slice"
+import cardReducer from "./cards/card-slice";
+import { authApi } from "./auth/auth-operations";
 import { boardsApi } from "./board/board-operations";
 import { columnsApi } from "./columns/column-operations";
 import { cardsApi } from "./cards/cards-operations";
@@ -36,6 +37,7 @@ const store = configureStore({
     column: columnReducer,
     chip: chipReducer,
     card: cardReducer,
+    [authApi.reducerPath]: authApi.reducer,
     [boardsApi.reducerPath]: boardsApi.reducer,
     [columnsApi.reducerPath]: columnsApi.reducer,
     [cardsApi.reducerPath]: cardsApi.reducer,
@@ -50,6 +52,7 @@ const store = configureStore({
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
     })
+      .concat(authApi.middleware)
       .concat(boardsApi.middleware)
       .concat(columnsApi.middleware)
       .concat(cardsApi.middleware)
