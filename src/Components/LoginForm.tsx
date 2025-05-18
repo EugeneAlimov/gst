@@ -12,22 +12,24 @@ import FormControl from "@mui/material/FormControl";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import Button from "@mui/material/Button";
+import { ThunkDispatch } from '@reduxjs/toolkit';
 
 import useAuth from "../libs/useAuth";
 import { setUserState } from "../Redux/auth/auth-slice";
 import { wrapperLogout } from "../libs/wrapperLogOut";
 
-export default function InputAdornments() {
-  const [showPassword, setShowPassword] = useState(false);
+const LoginForm: React.FC = () => {
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const { loginUser, refreshAccessToken, logoutUser } = useAuth();
 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
+  const [username, setUsername] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
 
+  // Тип для dispatch должен быть более конкретным в реальном приложении
   const dispatch = useDispatch();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     try {
       await loginUser(username, password);
@@ -40,7 +42,7 @@ export default function InputAdornments() {
     }
   };
 
-  const handleProtectedAction = async () => {
+  const handleProtectedAction = async (): Promise<void> => {
     try {
       const accessToken = localStorage.getItem("access_token");
 
@@ -56,9 +58,9 @@ export default function InputAdornments() {
     }
   };
 
-  const handleClickShowPassword = () => setShowPassword((show) => !show);
+  const handleClickShowPassword = (): void => setShowPassword((show) => !show);
 
-  const handleMouseDownPassword = (event) => {
+  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>): void => {
     event.preventDefault();
   };
 
@@ -86,7 +88,7 @@ export default function InputAdornments() {
               id="outlined-adornment-login"
               label="Login"
               value={username}
-              onChange={(event) => {
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                 setUsername(event.target.value);
               }}
             />
@@ -95,7 +97,7 @@ export default function InputAdornments() {
             <InputLabel htmlFor="outlined-adornment-password">Password</InputLabel>
             <OutlinedInput
               value={password}
-              onChange={(event) => {
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                 setPassword(event.target.value);
               }}
               id="outlined-adornment-password"
@@ -130,4 +132,6 @@ export default function InputAdornments() {
       <button onClick={handleProtectedAction}>Выполнить защищенное действие</button>
     </Paper>
   );
-}
+};
+
+export default LoginForm;

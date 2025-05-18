@@ -63,6 +63,7 @@ import {
 
 export default function Column({ columnName, columnId, columnIndex, boardHeight, activeBoardId, allChips }) {
   const { data: CARDS } = useGetCardsQuery(columnId);
+console.log('CARDS ', CARDS);
 
   const [cardPositionUpdate] = useUpdateCardInColumnMutation();
   const [cardCreater] = useCreateNewCardMutation();

@@ -1,3 +1,5 @@
+// src/libs/wrapperLogOut.ts
+import { Dispatch, AnyAction } from 'redux';
 import { clearUserState } from "../Redux/auth/auth-slice";
 import { boardsApi } from "../Redux/board/board-operations";
 import { columnsApi } from "../Redux/columns/column-operations";
@@ -8,7 +10,10 @@ import { commentsApi } from "../Redux/comments/comments-operations";
 import { dateTimeApi } from "../Redux/dateTime/dateTime-operations";
 import { userApi } from "../Redux/user/user-operations";
 
-export const wrapperLogout = (dispatch, logoutUser) => {
+export const wrapperLogout = (
+  dispatch: Dispatch<AnyAction>, 
+  logoutUser: () => Promise<void>
+): void => {
   logoutUser();
   dispatch(clearUserState());
   dispatch(boardsApi.util.resetApiState());

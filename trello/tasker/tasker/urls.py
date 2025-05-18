@@ -14,6 +14,13 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include("blog.urls"))
 """
+"""
+    GET /board-memberships/ — Список досок пользователя.
+    POST /board-memberships/{id}/add-member/ — Добавление участника.
+    POST /board-memberships/{id}/remove-member/ — Удаление участника.
+    POST /board-memberships/{id}/change-role/ — Изменение роли.
+    GET /board-memberships/{id}/members/ — Список участников доски.
+"""
 
 from django.conf import settings
 from django.conf.urls.static import static
@@ -32,7 +39,8 @@ router.register(r'user', views.UserViewSet, basename='user')
 router.register(r'board', views.BoardsViewSet, basename='board')
 router.register(r'user-boards', views.UserBoardsViewSet, basename='userBoard')
 router.register(r'card-in-column', views.CardInColumnViewSet, basename='cardInColumn')
-router.register(r'board-membership', views.BoardMembershipViewSet, basename='boardMembership')
+# router.register(r'board-membership', views.BoardMembershipViewSet, basename='boardMembership')
+router.register(r'board-memberships', views.BoardMembershipViewSet, basename='board-membership')
 
 # router.register(r'update-active-board', views.UpdateActiveBoardViewSet, basename='updateActiveBoard')
 
@@ -45,6 +53,7 @@ router.register(r'comment', views.CommentViewSet, basename='comment')
 router.register(r'checklist-item', views.ChecklistItemViewSet, basename='checklist-item')
 
 urlpatterns = [
+                  path('', include(router.urls)),
                   path('admin/', admin.site.urls),
                   path('api/v1/', include(router.urls)),
                   # path('api/v1/auth/', include('rest_framework.urls')),

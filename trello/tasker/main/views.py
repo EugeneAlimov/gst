@@ -11,42 +11,164 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from .serializers import *
 
 
+# class UserViewSet(viewsets.ModelViewSet):
+#     queryset = UserProfile.objects.all()
+#     serializer_class = UserSerializer
+#     permission_classes = (IsAuthenticated,)
+#
+#     def get_queryset(self):
+#         # Возвращаем только текущего аутентифицированного пользователя
+#         return UserProfile.objects.filter(id=self.request.user.id)
+#
+#
+# class UserBoardsViewSet(viewsets.ReadOnlyModelViewSet):
+#     queryset = BoardMembership.objects.all()
+#     serializer_class = BoardSerializer
+#     permission_classes = [IsAuthenticated]
+#
+#     def get_queryset(self):
+#         # Получаем все BoardMembership пользователя
+#         user_memberships = BoardMembership.objects.filter(user=self.request.user)
+#
+#         # Возвращаем доски, к которым принадлежит пользователь через BoardMembership
+#         return Board.objects.filter(board_memberships__in=user_memberships)
+
 class UserViewSet(viewsets.ModelViewSet):
+    """
+    Работа с данными текущего пользователя.
+    """
     queryset = UserProfile.objects.all()
     serializer_class = UserSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Возвращаем только текущего аутентифицированного пользователя
-        return UserProfile.objects.filter(id=self.request.user.id)
+        # Возвращаем только текущего пользователя
+        return UserProfile.objects.filter(pk=self.request.user.pk)
 
 
 class UserBoardsViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = BoardMembership.objects.all()
+    """
+    Работа с досками пользователя.
+    """
+    queryset = Board.objects.all()
     serializer_class = BoardSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Получаем все BoardMembership пользователя
-        user_memberships = BoardMembership.objects.filter(user=self.request.user)
+        # Возвращаем только доски текущего пользователя
+        return Board.objects.filter(user=self.request.user)
 
-        # Возвращаем доски, к которым принадлежит пользователь через BoardMembership
-        return Board.objects.filter(board_memberships__in=user_memberships)
+# class BoardMembershipViewSet(viewsets.ModelViewSet):
+#     queryset = BoardMembership.objects.all()
+#     serializer_class = BoardMembershipSerializer
+#     permission_classes = [IsAuthenticated]
+#
+#     def get_queryset(self):
+#         # Фильтрация по доске, если это необходимо
+#         board_id = self.request.query_params.get('board', None)
+#         if board_id:
+#             print('BoardMembership 1', BoardMembership)
+#             return BoardMembership.objects.filter(board_id=board_id)
+#         print('BoardMembership 2', BoardMembership)
+#         return BoardMembership.objects.all()
 
+class BoardMembershipViewSet(viewsets.ViewSet):
+    """
+    Вьюсет для управления участниками досок и взаимодействием с досками.
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
-class BoardMembershipViewSet(viewsets.ModelViewSet):
-    queryset = BoardMembership.objects.all()
-    serializer_class = BoardMembershipSerializer
-    permission_classes = [IsAuthenticated]
+    def list(self, request):
+        """
+        Возвращает список всех досок, на которых пользователь является участником.
+        """
+        boards = Board.objects.filter(members__user=request.user)
+        serializer = BoardSerializer(boards, many=True)
+        return Response(serializer.data)
 
-    def get_queryset(self):
-        # Фильтрация по доске, если это необходимо
-        board_id = self.request.query_params.get('board', None)
-        if board_id:
-            print('BoardMembership 1', BoardMembership)
-            return BoardMembership.objects.filter(board_id=board_id)
-        print('BoardMembership 2', BoardMembership)
-        return BoardMembership.objects.all()
+    @action(detail=True, methods=['post'], url_path='add-member')
+    def add_member(self, request, pk=None):
+        """
+        Добавляет участника к доске.
+        """
+        board = get_object_or_404(Board, pk=pk)
+        if board.user != request.user:
+            return Response({'error': 'У вас нет прав на добавление участников.'}, status=status.HTTP_403_FORBIDDEN)
+
+        user_id = request.data.get('user_id')
+        role = request.data.get('role', 'viewer')
+        user = get_object_or_404(UserProfile, pk=user_id)
+
+        # Проверяем, существует ли уже связь
+        if BoardMembership.objects.filter(board=board, user=user).exists():
+            return Response({'error': 'Этот пользователь уже является участником доски.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Создаем связь
+        BoardMembership.objects.create(board=board, user=user, role=role)
+        return Response({'message': f'Пользователь {user.username} добавлен с ролью {role}.'}, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='remove-member')
+    def remove_member(self, request, pk=None):
+        """
+        Удаляет участника с доски.
+        """
+        board = get_object_or_404(Board, pk=pk)
+        if board.user != request.user:
+            return Response({'error': 'У вас нет прав на удаление участников.'}, status=status.HTTP_403_FORBIDDEN)
+
+        user_id = request.data.get('user_id')
+        user = get_object_or_404(UserProfile, pk=user_id)
+
+        # Удаляем связь
+        membership = BoardMembership.objects.filter(board=board, user=user).first()
+        if not membership:
+            return Response({'error': 'Этот пользователь не является участником доски.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        membership.delete()
+        return Response({'message': f'Пользователь {user.username} удален с доски.'}, status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['post'], url_path='change-role')
+    def change_role(self, request, pk=None):
+        """
+        Изменяет роль участника на доске.
+        """
+        board = get_object_or_404(Board, pk=pk)
+        if board.user != request.user:
+            return Response({'error': 'У вас нет прав на изменение ролей участников.'}, status=status.HTTP_403_FORBIDDEN)
+
+        user_id = request.data.get('user_id')
+        role = request.data.get('role')
+        if role not in ['admin', 'editor', 'viewer']:
+            return Response({'error': 'Недопустимая роль.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = get_object_or_404(UserProfile, pk=user_id)
+        membership = BoardMembership.objects.filter(board=board, user=user).first()
+        if not membership:
+            return Response({'error': 'Этот пользователь не является участником доски.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        membership.role = role
+        membership.save()
+        return Response({'message': f'Роль пользователя {user.username} изменена на {role}.'})
+
+    @action(detail=True, methods=['get'], url_path='members')
+    def list_members(self, request, pk=None):
+        """
+        Возвращает список участников доски.
+        """
+        board = get_object_or_404(Board, pk=pk)
+        if not BoardMembership.objects.filter(board=board, user=request.user).exists():
+            return Response({'error': 'У вас нет доступа к участникам этой доски.'}, status=status.HTTP_403_FORBIDDEN)
+
+        members = BoardMembership.objects.filter(board=board)
+        data = [
+            {
+                'id': member.user.id,
+                'username': member.user.username,
+                'role': member.role,
+                'joined_at': member.joined_at
+            } for member in members
+        ]
+        return Response(data)
 
 
 class UpdateActiveBoardView(APIView):
@@ -149,41 +271,6 @@ class ColumnViewSet(viewsets.ModelViewSet):
 
         return Response(status=status.HTTP_200_OK)
 
-
-# class ColumnsOnBoardViewSet(viewsets.ModelViewSet):
-#     queryset = Column.objects.all()
-#     serializer_class = ColumnSerializer
-#     permission_classes = (IsAuthenticated,)
-#
-#     def partial_update(self, request, *args, **kwargs):
-#         """"Обновить положение колонок на доске.
-#             передается id доски чтобы отфильтровать колонки на этой доске"""
-#         columns = request.data.get('columns')
-#         print('columns', columns)
-#         pk = kwargs.get('pk', None)
-#         print('request.data columns ', request.data)
-#         if not pk:
-#             return Response({"error": "Method PUT not allowed: no pk"})
-#
-#         columns_queryset = Column.objects.filter(board=pk)
-#         print('columns_queryset ', columns_queryset)
-#
-#         if columns_queryset.exists():
-#             for c_s in columns_queryset:
-#                 c_s_id = c_s.id
-#
-#                 for c in columns:
-#                     if c['id'] == c_s_id:
-#                         index = c['index']
-#                         c_s.position_on_board = index
-#                     c_s.save()
-#             try:
-#                 instance = Column.objects.filter(board=pk)
-#                 serializer = BoardSerializer(instance)
-#
-#                 return Response(serializer.data)
-#             except Board.DoesNotExist:
-#                 return Response({"error": "Object not found"}, status=404)
 
 class ColumnsOnBoardViewSet(viewsets.ModelViewSet):
     queryset = Column.objects.all()

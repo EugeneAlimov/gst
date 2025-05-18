@@ -5,31 +5,55 @@ from rest_framework import serializers
 from .models import *
 
 
+# class BoardSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Board
+#         """"" Возможный вариант записи если необходимо выбрать все записи из БД без исключения
+#             fields = '__all__' либо fields = ('name_group', 'name_tag', 'tag_table', 'data_type', 'comment') если
+#             необходимы конкретные записи """
+#         fields = '__all__'
+#
+#
+# class ActiveBoardSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = UserProfile
+#         fields = ['active_board']  # Мы будем обновлять только это поле
+#
+#         def update(self, instance, validated_data):
+#             # Обновление только активной доски для текущего пользователя
+#             active_board = validated_data.get('active_board')
+#
+#             # Проверяем, что выбранная доска существует
+#             if not Board.objects.filter(id=active_board).exists():
+#                 raise serializers.ValidationError("The selected board does not exist.")
+#
+#             instance.active_board = active_board
+#             instance.save()
+#             return instance
+
 class BoardSerializer(serializers.ModelSerializer):
     class Meta:
         model = Board
-        """"" Возможный вариант записи если необходимо выбрать все записи из БД без исключения
-            fields = '__all__' либо fields = ('name_group', 'name_tag', 'tag_table', 'data_type', 'comment') если
-            необходимы конкретные записи """
-        fields = '__all__'
+        fields = ('id', 'name', 'created', 'updated')  # Указываем только необходимые поля
 
 
 class ActiveBoardSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['active_board']  # Мы будем обновлять только это поле
+        fields = ['active_board']
 
-        def update(self, instance, validated_data):
-            # Обновление только активной доски для текущего пользователя
-            active_board = validated_data.get('active_board')
+    def update(self, instance, validated_data):
+        # Обновление активной доски для текущего пользователя
+        active_board = validated_data.get('active_board')
 
-            # Проверяем, что выбранная доска существует
-            if not Board.objects.filter(id=active_board).exists():
-                raise serializers.ValidationError("The selected board does not exist.")
+        # Проверяем, что выбранная доска существует
+        if not Board.objects.filter(id=active_board.id).exists():
+            raise serializers.ValidationError("Выбранная доска не существует.")
 
-            instance.active_board = active_board
-            instance.save()
-            return instance
+        # Обновляем активную доску
+        instance.active_board = active_board
+        instance.save()
+        return instance
 
 
 class CardInColumnSerializer(serializers.ModelSerializer):

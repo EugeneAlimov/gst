@@ -11,7 +11,7 @@ import "./index.css";
 import { RestrictedRout } from "./Components/RestrictedRout.jsx";
 import { PrivateRoutes } from "./Components/PrivateRoutes.jsx";
 
-import LoginForm from "./Components/LoginForm.jsx"
+import LoginForm from "./Components/LoginForm.tsx"
 
 const App = lazy(() => import("./App" /* webpackChunkName: 'App' */));
 const BoardView = lazy(() => import("./Views/BoardView" /* webpackChunkName: 'BoardView' */));

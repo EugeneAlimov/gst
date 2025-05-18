@@ -1,8 +1,8 @@
-import { createSlice } from "@reduxjs/toolkit";
-// import authOperations from "./auth-operations";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { AuthState } from "../../types/auth";
 import { register, logIn, refreshUser, logOut } from "./auth-operations";
 
-const initialState = {
+const initialState: AuthState = {
   user: { name: null, email: null },
   accessToken: null,
   refreshToken: null,
@@ -10,11 +10,16 @@ const initialState = {
   isRefreshing: false,
 };
 
+interface UserCredentials {
+  username: string;
+  password: string;
+}
+
 const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    setUserState: (state, action) => {
+    setUserState: (state, action: PayloadAction<UserCredentials>) => {
       state.user.name = action.payload.username;
       state.isLoggedIn = true;
     },
@@ -39,7 +44,6 @@ const authSlice = createSlice({
       })
       .addCase(refreshUser.fulfilled, (state, action) => {
         state.accessToken = action.payload.access;
-        // state.refreshToken = action.payload.refresh;
         state.isRefreshing = true;
       })
       .addCase(logOut.fulfilled, (state) => {
@@ -54,4 +58,4 @@ const authSlice = createSlice({
 
 export default authSlice.reducer;
 export const { setUserState, clearUserState } = authSlice.actions;
-export const userData = (state) => state.auth;
+export const userData = (state: { auth: AuthState }) => state.auth;
