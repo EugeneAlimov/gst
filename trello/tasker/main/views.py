@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from rest_framework.templatetags import rest_framework
 from rest_framework.views import APIView
 from rest_framework import permissions
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -11,27 +12,6 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from .serializers import *
 
 
-# class UserViewSet(viewsets.ModelViewSet):
-#     queryset = UserProfile.objects.all()
-#     serializer_class = UserSerializer
-#     permission_classes = (IsAuthenticated,)
-#
-#     def get_queryset(self):
-#         # Возвращаем только текущего аутентифицированного пользователя
-#         return UserProfile.objects.filter(id=self.request.user.id)
-#
-#
-# class UserBoardsViewSet(viewsets.ReadOnlyModelViewSet):
-#     queryset = BoardMembership.objects.all()
-#     serializer_class = BoardSerializer
-#     permission_classes = [IsAuthenticated]
-#
-#     def get_queryset(self):
-#         # Получаем все BoardMembership пользователя
-#         user_memberships = BoardMembership.objects.filter(user=self.request.user)
-#
-#         # Возвращаем доски, к которым принадлежит пользователь через BoardMembership
-#         return Board.objects.filter(board_memberships__in=user_memberships)
 
 class UserViewSet(viewsets.ModelViewSet):
     """
@@ -58,19 +38,6 @@ class UserBoardsViewSet(viewsets.ReadOnlyModelViewSet):
         # Возвращаем только доски текущего пользователя
         return Board.objects.filter(user=self.request.user)
 
-# class BoardMembershipViewSet(viewsets.ModelViewSet):
-#     queryset = BoardMembership.objects.all()
-#     serializer_class = BoardMembershipSerializer
-#     permission_classes = [IsAuthenticated]
-#
-#     def get_queryset(self):
-#         # Фильтрация по доске, если это необходимо
-#         board_id = self.request.query_params.get('board', None)
-#         if board_id:
-#             print('BoardMembership 1', BoardMembership)
-#             return BoardMembership.objects.filter(board_id=board_id)
-#         print('BoardMembership 2', BoardMembership)
-#         return BoardMembership.objects.all()
 
 class BoardMembershipViewSet(viewsets.ViewSet):
     """
@@ -239,16 +206,37 @@ class ColumnViewSet(viewsets.ModelViewSet):
     serializer_class = ColumnSerializer
     permission_classes = (IsAuthenticated,)
 
-    def get_queryset(self):
-        """"Получаем все колонки, которые относятся к доске"""
+    def create(self, request, *args, **kwargs):
+        # Проверяем, что все необходимые данные присутствуют
+        if 'board' not in request.data:
+            return Response({"error": "Не указана доска"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Проверяем, что доска существует
+        board_id = request.data.get('board')
         try:
-            board = self.request.GET.get('board')
-            response = Column.objects.filter(board=board)
+            board = Board.objects.get(id=board_id)
+        except Board.DoesNotExist:
+            return Response({"error": f"Доска с ID {board_id} не найдена"}, status=status.HTTP_404_NOT_FOUND)
 
-            return response
-        except Column.DoesNotExist:
+        # Устанавливаем позицию, если не указана
+        data = request.data.copy()
+        if 'position_on_board' not in data or not data.get('position_on_board'):
+            # Получаем максимальную позицию и добавляем 1
+            max_position = Column.objects.filter(board_id=board_id).aggregate(models.Max('position_on_board'))
+            max_position = max_position['position_on_board__max'] or 0
+            data['position_on_board'] = max_position + 1
 
-            return Response({"error": "Object not found"}, status=404)
+        # Если имя не указано, используем значение по умолчанию
+        if 'name' not in data or not data.get('name'):
+            data['name'] = 'Новая колонка'
+
+        # Создаем колонку
+        serializer = self.get_serializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, *args, **kwargs):
         """"Изменяем имя колонки"""
@@ -370,31 +358,116 @@ class CardViewSet(viewsets.ModelViewSet):
 
         return Response(data)
 
-    def perform_create(self, serializer):
-        """"Создаем новую карточку - Создание новой и подготовка полей"""
-        # Сначала создаем карту без привязки к пользователям
-        card = serializer.save()
+    # def perform_create(self, serializer):
+    #     """"Создаем новую карточку - Создание новой и подготовка полей"""
+    #     # Сначала создаем карту без привязки к пользователям
+    #     card = serializer.save()
+    #
+    #     # Предположим, что текущий пользователь является экземпляром UserProfile и мы хотим его добавить к карте
+    #     # Например, добавляем текущего пользователя к ManyToMany полю
+    #     user_profile = UserProfile.objects.get(username=self.request.user)  # Получаем профиль текущего пользователя
+    #     card.user.add(user_profile)
+    #     column_id = self.request.data.get('column_id')
+    #     position_in_column = self.request.data.get('position_in_column', 0)
+    #     column = get_object_or_404(Column, id=column_id)
+    #     CardInColumn.objects.create(card=card, column=column, position_in_column=position_in_column)
+    #
+    # def create(self, request, *args, **kwargs):
+    #     """"Создаем новую карточку - Сохранение"""
+    #     serializer = self.get_serializer(data=request.data)
+    #
+    #     if not serializer.is_valid():
+    #         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    #
+    #     self.perform_create(serializer)
+    #
+    #     headers = self.get_success_headers(serializer.data)
+    #
+    #     return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-        # Предположим, что текущий пользователь является экземпляром UserProfile и мы хотим его добавить к карте
-        # Например, добавляем текущего пользователя к ManyToMany полю
-        user_profile = UserProfile.objects.get(username=self.request.user)  # Получаем профиль текущего пользователя
-        card.user.add(user_profile)
-        column_id = self.request.data.get('column_id')
-        position_in_column = self.request.data.get('position_in_column', 0)
-        column = get_object_or_404(Column, id=column_id)
-        CardInColumn.objects.create(card=card, column=column, position_in_column=position_in_column)
+    def perform_create(self, serializer):
+        """Создаем новую карточку с привязкой к пользователю и колонке"""
+        try:
+            # Получаем текущего пользователя - он уже является экземпляром UserProfile
+            user_profile = self.request.user
+
+            # Получаем и проверяем column_id
+            column_id = self.request.data.get('column_id')
+            if not column_id:
+                raise ValueError("Не указан column_id")
+
+            # Проверяем, существует ли колонка
+            try:
+                column = Column.objects.get(id=column_id)
+            except Column.DoesNotExist:
+                raise ValueError(f"Колонка с ID {column_id} не найдена")
+
+            # Определяем позицию карточки в колонке
+            position_in_column = self.request.data.get('position_in_column')
+            if position_in_column is None:
+                # Если позиция не указана, ставим карточку в конец
+                max_position = CardInColumn.objects.filter(column=column).aggregate(
+                    models.Max('position_in_column')
+                )['position_in_column__max'] or -1
+                position_in_column = max_position + 1
+
+            # Создаем карточку
+            card = serializer.save(board=column.board)  # Устанавливаем доску автоматически
+
+            # Добавляем пользователя к карточке
+            card.assigned_users.add(user_profile)
+
+            # Создаем связь с колонкой
+            CardInColumn.objects.create(
+                card=card,
+                column=column,
+                position_in_column=position_in_column
+            )
+
+            return card
+
+        except ValueError as e:
+            # Конвертируем ValueError в ValidationError, чтобы DRF её правильно обработал
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(str(e))
+        except Exception as e:
+            # Логируем неожиданные ошибки
+            print(f"Ошибка при создании карточки: {str(e)}")
+            raise  # Пробрасываем ошибку дальше
 
     def create(self, request, *args, **kwargs):
-        """"Создаем новую карточку - Сохранение"""
-        serializer = self.get_serializer(data=request.data)
+        """Создание карточки с пустым именем и автоматическим определением доски"""
+        # Создаем копию данных запроса для модификации
+        data = request.data.copy()
 
+        # Убеждаемся, что name может быть пустым
+        if 'name' not in data:
+            data['name'] = ""  # Пустое имя по умолчанию
+
+        # Обработка поля board - получаем из колонки
+        if 'board' not in data and 'column_id' in data:
+            column_id = data.get('column_id')
+            try:
+                column = Column.objects.get(id=column_id)
+                data['board'] = column.board.id  # Устанавливаем board из колонки
+                print(f"Автоматически установлена доска {data['board']} из колонки {column_id}")
+            except Column.DoesNotExist:
+                return Response(
+                    {"error": f"Колонка с ID {column_id} не найдена"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        # Стандартная валидация через сериализатор
+        serializer = self.get_serializer(data=data)
         if not serializer.is_valid():
+            print("Ошибки валидации:", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        # Создание карточки
         self.perform_create(serializer)
 
+        # Возвращаем данные созданной карточки
         headers = self.get_success_headers(serializer.data)
-
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def partial_update(self, request, *args, **kwargs):

@@ -5,31 +5,6 @@ from rest_framework import serializers
 from .models import *
 
 
-# class BoardSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Board
-#         """"" Возможный вариант записи если необходимо выбрать все записи из БД без исключения
-#             fields = '__all__' либо fields = ('name_group', 'name_tag', 'tag_table', 'data_type', 'comment') если
-#             необходимы конкретные записи """
-#         fields = '__all__'
-#
-#
-# class ActiveBoardSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = UserProfile
-#         fields = ['active_board']  # Мы будем обновлять только это поле
-#
-#         def update(self, instance, validated_data):
-#             # Обновление только активной доски для текущего пользователя
-#             active_board = validated_data.get('active_board')
-#
-#             # Проверяем, что выбранная доска существует
-#             if not Board.objects.filter(id=active_board).exists():
-#                 raise serializers.ValidationError("The selected board does not exist.")
-#
-#             instance.active_board = active_board
-#             instance.save()
-#             return instance
 
 class BoardSerializer(serializers.ModelSerializer):
     class Meta:
@@ -66,20 +41,61 @@ class CardInColumnSerializer(serializers.ModelSerializer):
         fields = ['id', 'card_id', 'column_id', 'position_in_column']
 
 
+# class CardSerializer(serializers.ModelSerializer):
+#     column_id = serializers.SerializerMethodField()  # Получаем column_id через метод
+#     position_in_column = serializers.SerializerMethodField()  # Получаем position_in_column через метод
+#     date_time_start = serializers.DateTimeField(required=False)
+#     date_time_finish = serializers.DateTimeField(required=False)
+#     date_time_reminder = serializers.DateTimeField(required=False)
+#     created = serializers.DateTimeField(required=False)
+#     updated = serializers.DateTimeField(required=False)
+#     header_image = serializers.ImageField(required=False)
+#     card_in_columns = CardInColumnSerializer(many=True, read_only=True, required=False)
+#
+#     class Meta:
+#         model = Card
+#         fields = '__all__'
+#
+#     def get_column_id(self, obj):
+#         # Предполагаем, что карточка может быть привязана к одной колонке
+#         card_in_column = obj.card_in_columns.first()  # Берем первую колонку
+#         if card_in_column:
+#             return card_in_column.column.id  # Возвращаем ID колонки
+#         return None
+#
+#     def get_position_in_column(self, obj):
+#         # Предполагаем, что карточка может быть привязана к одной колонке
+#         card_in_column = obj.card_in_columns.first()
+#         if card_in_column:
+#             return card_in_column.position_in_column  # Возвращаем позицию карточки в колонке
+#         return None
+
 class CardSerializer(serializers.ModelSerializer):
     column_id = serializers.SerializerMethodField()  # Получаем column_id через метод
     position_in_column = serializers.SerializerMethodField()  # Получаем position_in_column через метод
-    date_time_start = serializers.DateTimeField(required=False)
-    date_time_finish = serializers.DateTimeField(required=False)
-    date_time_reminder = serializers.DateTimeField(required=False)
-    created = serializers.DateTimeField(required=False)
-    updated = serializers.DateTimeField(required=False)
-    header_image = serializers.ImageField(required=False)
     card_in_columns = CardInColumnSerializer(many=True, read_only=True, required=False)
+    # Объявляем поля, которые могут быть null или могут отсутствовать
+    date_time_start = serializers.DateTimeField(required=False, allow_null=True)
+    date_time_finish = serializers.DateTimeField(required=False, allow_null=True)
+    date_time_reminder = serializers.DateTimeField(required=False, allow_null=True)
+    created = serializers.DateTimeField(required=False, read_only=True)  # Поле только для чтения
+    updated = serializers.DateTimeField(required=False, read_only=True)  # Поле только для чтения
+    header_image = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Card
         fields = '__all__'
+
+    def validate(self, data):
+        """Валидация данных карточки"""
+        # Проверяем, что date_time_finish позже чем date_time_start если оба указаны
+        if 'date_time_start' in data and 'date_time_finish' in data:
+            if data['date_time_start'] and data['date_time_finish']:
+                if data['date_time_finish'] < data['date_time_start']:
+                    raise serializers.ValidationError(
+                        "Дата завершения не может быть раньше даты начала"
+                    )
+        return data
 
     def get_column_id(self, obj):
         # Предполагаем, что карточка может быть привязана к одной колонке

@@ -92,6 +92,8 @@ export default function TaskCard({
 
   useEffect(() => {
     if (!!!allChips) return;
+console.log(allChips);
+
     const cardChips = chips.map((chip) => {
       const newChip = allChips.find((el) => el.id === chip);
       return newChip;

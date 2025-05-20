@@ -156,69 +156,29 @@ class Column(models.Model):
     def __str__(self):
         return self.name
 
+
 class Card(models.Model):
     """
     Карточка задачи.
     """
-    name = models.CharField(  # Используем name вместо title для совместимости
-        max_length=255,
-        verbose_name='Название карточки'
-    )
-    assigned_users = models.ManyToManyField(  # Название из админки
-        UserProfile,
-        blank=True,
-        related_name='assigned_cards',
-        verbose_name='Назначенные пользователи'
-    )
-    description = models.TextField(
-        blank=True,
-        verbose_name='Описание'
-    )
-    board = models.ForeignKey(
-        Board,
-        on_delete=models.CASCADE,
-        related_name='cards',
-        verbose_name='Доска'
-    )
-    is_completed = models.BooleanField(  # Поле из админки
-        default=False,
-        verbose_name='Выполнено'
-    )
-    is_archived = models.BooleanField(  # Поле из админки
-        default=False,
-        verbose_name='Архивная'
-    )
-    created = models.DateTimeField(  # Сохраняем названия
-        auto_now_add=True,
-        verbose_name='Дата создания'
-    )
-    updated = models.DateTimeField(  # Сохраняем названия
-        auto_now=True,
-        verbose_name='Дата обновления'
-    )
+    name = models.CharField(max_length=255, blank=True, null=True, verbose_name='Название карточки')  # Используем name вместо title для совместимости
+    assigned_users = models.ManyToManyField(UserProfile, blank=True, related_name='assigned_cards',
+                                            verbose_name='Назначенные пользователи') # Название из админки
+    description = models.TextField(blank=True, verbose_name='Описание')
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='cards', verbose_name='Доска')
+    chips = models.ManyToManyField('Chip', blank=True, related_name='cards', verbose_name='Метки/Чипы')
+    is_completed = models.BooleanField(default=False, verbose_name='Выполнено') # Поле из админки
+    is_archived = models.BooleanField(default=False, verbose_name='Архивная') # Поле из админки
+    created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания') # Сохраняем названия
+    updated = models.DateTimeField(auto_now=True, verbose_name='Дата обновления') # Сохраняем названия
     # Дополнительные поля, которые могут быть полезны
-    due_date = models.DateTimeField(
-        null=True, blank=True,
-        verbose_name='Срок выполнения'
-    )
-    reminder_date = models.DateTimeField(
-        null=True, blank=True,
-        verbose_name='Напоминание'
-    )
-    priority = models.IntegerField(
-        choices=[(1, 'Низкий'), (2, 'Средний'), (3, 'Высокий'), (4, 'Критический')],
-        default=2,
-        verbose_name='Приоритет'
-    )
-    is_subscribed = models.BooleanField(
-        default=False,
-        verbose_name='Подписаны на обновления'
-    )
-    header_image = models.ImageField(
-        upload_to='card_headers/',
-        blank=True, null=True,
-        verbose_name='Изображение заголовка'
-    )
+    due_date = models.DateTimeField(null=True, blank=True, verbose_name='Срок выполнения')
+    reminder_date = models.DateTimeField(null=True, blank=True, verbose_name='Напоминание')
+    priority = models.IntegerField(choices=[(1, 'Низкий'), (2, 'Средний'), (3, 'Высокий'), (4, 'Критический')],
+                                   default=2, verbose_name='Приоритет')
+    is_subscribed = models.BooleanField(default=False, verbose_name='Подписаны на обновления')
+    header_image = models.ImageField(upload_to='card_headers/', blank=True, null=True,
+                                     verbose_name='Изображение заголовка')
 
     class Meta:
         verbose_name = 'Карточка'
@@ -227,6 +187,7 @@ class Card(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class CardInColumn(models.Model):
     """
