@@ -20,7 +20,8 @@ import { authApi } from "./auth/auth-operations";
 import { boardsApi } from "./board/board-operations";
 import { columnsApi } from "./columns/column-operations";
 import { cardsApi } from "./cards/cards-operations";
-import { chipsApi } from "./chip/chip-operations";
+// import { chipsApi } from "./chip/chip-operations";
+import { chipsApi, colorsApi } from "./chip/chip-operations";
 import { commentsApi } from "./comments/comments-operations";
 import { checklistApi } from "./checklist/checklist-operations";
 import { userApi } from "./user/user-operations";
@@ -42,6 +43,7 @@ const store = configureStore({
     [columnsApi.reducerPath]: columnsApi.reducer,
     [cardsApi.reducerPath]: cardsApi.reducer,
     [chipsApi.reducerPath]: chipsApi.reducer,
+    [colorsApi.reducerPath]: colorsApi.reducer,
     [commentsApi.reducerPath]: commentsApi.reducer,
     [checklistApi.reducerPath]: checklistApi.reducer,
     [userApi.reducerPath]: userApi.reducer,
@@ -57,6 +59,7 @@ const store = configureStore({
       .concat(columnsApi.middleware)
       .concat(cardsApi.middleware)
       .concat(chipsApi.middleware)
+      .concat(colorsApi.middleware)
       .concat(commentsApi.middleware)
       .concat(checklistApi.middleware)
       .concat(userApi.middleware),

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 
 //atlaskit/pragmatic-drag-and-drop
@@ -57,7 +57,7 @@ const PaperComponent = (props) => {
   return <Paper sx={style.draggablePaper} {...props} />;
 };
 
-export default function TaskCard({
+function TaskCard({
   columnId,
   checklist_how_many,
   comments_how_many,
@@ -75,13 +75,43 @@ export default function TaskCard({
   allChips,
 }) {
   const [cardTextUpdater] = useUpdateCardDetailMutation();
+
   const dispatch = useDispatch();
   const cardRef = useRef(null);
   const inputRef = useRef(null);
 
+  const cardKey = `card-${id}-${chips?.length || 0}-${Date.now()}`;
+
+  const processedChips = useMemo(() => {
+    if (!allChips || !chips) {
+      console.log(`Card ${id}: No chips data available`, { allChips: !!allChips, chips: !!chips });
+      return [];
+    }
+
+    console.log(`Card ${id}: Processing chips`, {
+      chipsCount: chips.length,
+      allChipsCount: allChips.length,
+      chipIds: chips,
+      sampleAllChip: allChips[0],
+    });
+
+    const result = chips
+      .map((chip) => {
+        const foundChip = allChips.find((el) => el.id === chip);
+        if (!foundChip) {
+          console.log(`Card ${id}: Chip with id ${chip} not found in allChips`);
+        }
+        return foundChip;
+      })
+      .filter(Boolean);
+
+    console.log(`Card ${id}: Processed ${result.length} chips from ${chips.length} chip IDs`);
+    return result;
+  }, [allChips, chips, id]);
+
   const [showEditIcon, setShowEditIcon] = useState(false);
   const [openPop, setOpenPop] = useState(false);
-  const [chipsArr, setChipsArr] = useState([]);
+  const [chipsArr, setChipsArr] = useState(processedChips);
   const [cardDragging, setCardDragging] = useState(false);
   const [preview, setPreview] = useState(null);
   const [closestEdge, setClosestEdge] = useState(null);
@@ -91,16 +121,13 @@ export default function TaskCard({
   const [cardTextBuffer, setCardTextBuffer] = useState("");
 
   useEffect(() => {
-    if (!!!allChips) return;
-console.log(allChips);
-
-    const cardChips = chips.map((chip) => {
-      const newChip = allChips.find((el) => el.id === chip);
-      return newChip;
+    console.log(`Card ${id}: Updating chips array`, {
+      oldCount: chipsArr.length,
+      newCount: processedChips.length,
+      inPopup,
     });
-
-    setChipsArr(cardChips);
-  }, [allChips, chips]);
+    setChipsArr(processedChips);
+  }, [processedChips, id, inPopup]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -173,6 +200,10 @@ console.log(allChips);
     );
   }, [setPreview, setClosestEdge, setCardDragging]);
 
+  const handleMouseOver = useCallback(() => setShowEditIcon(true), []);
+  const handleMouseOut = useCallback(() => setShowEditIcon(false), []);
+  const handleEditClick = useCallback(() => setOpenPop(true), []);
+
   const popClose = () => {
     setOpenPop(false);
     dispatch(popUpToOpen(0));
@@ -181,6 +212,7 @@ console.log(allChips);
   return (
     <Box
       ref={cardRef}
+      key={inPopup ? cardKey : undefined} // Используем key только в попапе
       sx={{
         display: "flex",
         flexDirection: closestEdge === "top" ? "column-reverse" : "column",
@@ -189,12 +221,12 @@ console.log(allChips);
       <Card
         sx={{ ...style.cardStyle }}
         style={cardDragging ? { opacity: 0.5 } : {}}
-        onMouseOver={() => setShowEditIcon(true)}
-        onMouseOut={() => setShowEditIcon(false)}
+        onMouseOver={handleMouseOver}
+        onMouseOut={handleMouseOut}
       >
         {showEditIcon && !inPopup && (
           <Box sx={style.boxEditOutlinedIconStyle}>
-            <IconButton onClick={() => setOpenPop(true)} aria-label="edit">
+            <IconButton onClick={handleEditClick} aria-label="edit">
               <EditOutlinedIcon />
             </IconButton>
           </Box>
@@ -311,3 +343,14 @@ console.log(allChips);
     </Box>
   );
 }
+
+export default memo(TaskCard, (prevProps, nextProps) => {
+  // Кастомная функция сравнения для избежания лишних перерендеров
+  return (
+    prevProps.id === nextProps.id &&
+    prevProps.text === nextProps.text &&
+    prevProps.chips?.length === nextProps.chips?.length &&
+    prevProps.allChips?.length === nextProps.allChips?.length &&
+    JSON.stringify(prevProps.chips) === JSON.stringify(nextProps.chips)
+  );
+});

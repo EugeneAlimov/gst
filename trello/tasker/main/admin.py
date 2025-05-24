@@ -1,97 +1,8 @@
-# from django.contrib import admin
-# from django.contrib.auth.admin import UserAdmin
-# from .forms import UserProfileChangeForm
-# from django.db import transaction
-# from django import forms
-#
-# from .models import *
-#
-#
-# @admin.register(UserProfile)
-# class UserProfileAdmin(admin.ModelAdmin):
-#     list_display = ('username', 'email', 'active_board', 'is_staff', 'is_active')
-#     search_fields = ('username', 'email')
-#     list_filter = ('is_staff', 'is_active')
-#
-# @admin.register(Board)
-# class BoardAdmin(admin.ModelAdmin):
-#     list_display = ('name', 'user', 'is_active', 'created', 'updated')
-#     search_fields = ('name', 'user__username')
-#     list_filter = ('is_active', 'created')
-#
-# @admin.register(BoardMembership)
-# class BoardMembershipAdmin(admin.ModelAdmin):
-#     list_display = ('board', 'user', 'role', 'joined_at')
-#     search_fields = ('board__name', 'user__username', 'role')
-#     list_filter = ('role', 'joined_at')
-#
-# class ColumnAdmin(admin.ModelAdmin):
-#     list_display = [field.name for field in Column._meta.fields]
-#     list_display_links = ['name']
-#
-#
-# admin.site.register(Column, ColumnAdmin)
-#
-# class CardAdminForm(forms.ModelForm):
-#     class Meta:
-#         model = Card
-#         fields = '__all__'
-#
-#     assigned_users = forms.ModelMultipleChoiceField(
-#         queryset=UserProfile.objects.all(),
-#         widget=admin.widgets.FilteredSelectMultiple('Назначенные пользователи', is_stacked=False),
-#     )
-#
-# @admin.register(Card)
-# class CardAdmin(admin.ModelAdmin):
-#     form = CardAdminForm
-#     list_display = ('name', 'is_completed', 'is_archived', 'created', 'updated')
-#     list_filter = ('is_completed', 'is_archived', 'created', 'updated')
-#     search_fields = ('name', 'description')
-#     filter_horizontal = ('assigned_users',)  # Позволяет использовать интерфейс для выбора пользователей
-#
-#
-# class ChipAdmin(admin.ModelAdmin):
-#     list_display = [field.name for field in Chip._meta.fields]
-#     list_display_links = ['name']
-#
-#
-# admin.site.register(Chip, ChipAdmin)
-#
-#
-# class CommentAdmin(admin.ModelAdmin):
-#     list_display = [field.name for field in Comment._meta.fields]
-#     list_display_links = ['text']
-#
-#
-# admin.site.register(Comment, CommentAdmin)
-#
-#
-# class ChecklistItemAdmin(admin.ModelAdmin):
-#     list_display = [field.name for field in ChecklistItem._meta.fields]
-#     list_display_links = ['description']
-#
-#
-# admin.site.register(ChecklistItem, ChecklistItemAdmin)
-#
-#
-# class ColorAdmin(admin.ModelAdmin):
-#     list_display = [field.name for field in Color._meta.fields]
-#     list_display_links = ['color']
-#
-#
-# admin.site.register(Color, ColorAdmin)
-#
-#
-# class CardInColumnAdmin(admin.ModelAdmin):
-#     list_display = [field.name for field in CardInColumn._meta.fields]
-#     list_display_links = ['card']
-#
-#
-# admin.site.register(CardInColumn, CardInColumnAdmin)
 from django.contrib import admin
+from django.utils.html import format_html
 from django import forms
 from .models import *
+
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
@@ -106,11 +17,13 @@ class UserProfileAdmin(admin.ModelAdmin):
         ('Важные даты', {'fields': ('last_login', 'date_joined')}),
     )
 
+
 @admin.register(Board)
 class BoardAdmin(admin.ModelAdmin):
     list_display = ('name', 'user', 'is_active', 'created', 'updated')
     search_fields = ('name', 'user__username')
     list_filter = ('is_active', 'created')
+
 
 @admin.register(BoardMembership)
 class BoardMembershipAdmin(admin.ModelAdmin):
@@ -118,16 +31,19 @@ class BoardMembershipAdmin(admin.ModelAdmin):
     search_fields = ('board__name', 'user__username', 'role')
     list_filter = ('role', 'joined_at')
 
+
 @admin.register(Column)
 class ColumnAdmin(admin.ModelAdmin):
     list_display = ('name', 'board', 'position_on_board', 'created', 'updated')
     search_fields = ('name', 'board__name')
     list_filter = ('created', 'updated')
 
+
 class CardAdminForm(forms.ModelForm):
     class Meta:
         model = Card
         fields = '__all__'
+
 
 @admin.register(Card)
 class CardAdmin(admin.ModelAdmin):
@@ -137,11 +53,6 @@ class CardAdmin(admin.ModelAdmin):
     search_fields = ('name', 'description')
     filter_horizontal = ('assigned_users',)
 
-@admin.register(Chip)
-class ChipAdmin(admin.ModelAdmin):
-    list_display = ('name', 'color', 'created', 'updated')
-    search_fields = ('name', 'color')
-    list_filter = ('created', 'updated')
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
@@ -149,16 +60,125 @@ class CommentAdmin(admin.ModelAdmin):
     search_fields = ('text', 'card__name')
     list_filter = ('created', 'updated')
 
+
 @admin.register(ChecklistItem)
 class ChecklistItemAdmin(admin.ModelAdmin):
     list_display = ('description', 'card', 'is_checked', 'created', 'updated')
     search_fields = ('description', 'card__name')
     list_filter = ('is_checked', 'created', 'updated')
 
+
 @admin.register(Color)
 class ColorAdmin(admin.ModelAdmin):
-    list_display = ('color', 'color_name', 'color_number')
-    search_fields = ('color', 'color_name')
+    list_display = ('color_preview', 'color_number', 'color_name', 'normal_color', 'hover_color', 'is_dark')
+    search_fields = ('color_name', 'color_number', 'normal_color')
+    list_filter = ('is_dark',)
+    ordering = ('color_number',)
+
+    fields = (
+        'color_number',
+        'color_name',
+        'normal_color',
+        'hover_color',
+        'text_color',
+        'is_dark',
+        'color_preview'
+    )
+    readonly_fields = ('color_preview',)
+
+    def color_preview(self, obj):
+        """Создает интерактивный предпросмотр цвета"""
+        if not obj.normal_color:
+            return '-'
+
+        return format_html(
+            '<div style="display: flex; gap: 10px; align-items: center;">'
+            '<div style="'
+            'background-color: {}; '
+            'width: 60px; '
+            'height: 30px; '
+            'border-radius: 4px; '
+            'border: 1px solid #ddd; '
+            'transition: background-color 0.3s; '
+            'display: flex; '
+            'align-items: center; '
+            'justify-content: center; '
+            'color: {}; '
+            'font-weight: bold; '
+            'font-size: 10px; '
+            '" '
+            'onmouseover="this.style.backgroundColor=\'{}\'" '
+            'onmouseout="this.style.backgroundColor=\'{}\'" '
+            'title="Наведите для просмотра hover-эффекта"'
+            '>#{}</div>'
+            '<div style="font-size: 11px; color: #666;">'
+            'Normal: {}<br>'
+            'Hover: {}'
+            '</div>'
+            '</div>',
+            obj.normal_color,
+            obj.text_color,
+            obj.hover_color,
+            obj.normal_color,
+            obj.color_number,
+            obj.normal_color,
+            obj.hover_color
+        )
+
+    color_preview.short_description = 'Предпросмотр'
+
+
+class ColorAdminForm(forms.ModelForm):
+    """Форма для администрирования цветов с дополнительными полями"""
+
+    class Meta:
+        model = Color
+        fields = '__all__'
+
+    # Дополнительное поле для генерации hover-цвета
+    generate_hover = forms.BooleanField(
+        required=False,
+        label='Сгенерировать цвет при наведении',
+        help_text='Автоматически создать цвет при наведении на основе базового'
+    )
+
+
+# Обновляем админку для Chip с учётом связи с Color
+@admin.register(Chip)
+class ChipAdmin(admin.ModelAdmin):
+    list_display = ('name', 'get_color_preview', 'get_color_name', 'created')
+    list_filter = ('color', 'created')
+    search_fields = ('name', 'color__color_name')
+    autocomplete_fields = ['color']
+
+    def get_color_name(self, obj):
+        return obj.color.color_name if obj.color else '-'
+
+    get_color_name.short_description = 'Цвет'
+
+    def get_color_preview(self, obj):
+        if not obj.color:
+            return '-'
+
+        return format_html(
+            '<div style="'
+            'background-color: {}; '
+            'width: 40px; '
+            'height: 20px; '
+            'border-radius: 3px; '
+            'border: 1px solid #ddd; '
+            'transition: background-color 0.3s; '
+            '" '
+            'onmouseover="this.style.backgroundColor=\'{}\'" '
+            'onmouseout="this.style.backgroundColor=\'{}\'"'
+            '></div>',
+            obj.color.normal_color,
+            obj.color.hover_color,
+            obj.color.normal_color
+        )
+
+    get_color_preview.short_description = 'Предпросмотр'
+
 
 @admin.register(CardInColumn)
 class CardInColumnAdmin(admin.ModelAdmin):

@@ -1,4 +1,3 @@
-import React from "react";
 import { useDispatch } from "react-redux";
 
 // import components
@@ -21,22 +20,43 @@ export default function ChipContainer({
   chipRelateToCardUpdate,
   color_number,
   text: chipText,
+  name: chipName,
+  color,
   labelId,
   id: chipId,
   cardId,
 }) {
   const dispatch = useDispatch();
-  const color = chipColor[color_number];
+
+  // Используем цвет из объекта или fallback на старую логику
+  const chipColor = color || (color_number !== undefined ? chipColor[color_number] : null);
+  const displayText = chipName || chipText || "Без названия";
 
   const editChipHangler = () => {
     dispatch(popUpToOpen(3));
 
+    // Формируем полные данные о цвете для редактирования
+    const colorData = color
+      ? {
+          id: color.id,
+          colorNumber: color.color_number || color.colorNumber,
+          normal: color.normal_color || color.normal,
+          hover: color.hover_color || color.hover,
+          colorName: color.color_name || color.colorName,
+          normal_color: color.normal_color || color.normal,
+          hover_color: color.hover_color || color.hover,
+          color_name: color.color_name || color.colorName,
+        }
+      : null;
+
     const targrtChipParameters = {
       targetChipId: chipId,
-      targetChipText: chipText,
-      targetChipColor: color,
+      targetChipText: displayText,
+      targetChipColor: colorData,
       isEdit: true,
     };
+
+    console.log("Setting target chip data:", targrtChipParameters); // Для отладки
     dispatch(targetChipData(targrtChipParameters));
   };
 
@@ -63,8 +83,10 @@ export default function ChipContainer({
         />
         <CardChip
           chipId={chipId}
-          color={color}
-          chipText={chipText}
+          chip={{
+            name: displayText,
+            color: chipColor,
+          }}
           chipStyle={chipStyleChipContainer}
         />
       </ListItemButton>

@@ -1,9 +1,5 @@
-from django.contrib.auth import get_user_model
-from drf_writable_nested import WritableNestedModelSerializer
-
 from rest_framework import serializers
 from .models import *
-
 
 
 class BoardSerializer(serializers.ModelSerializer):
@@ -40,35 +36,6 @@ class CardInColumnSerializer(serializers.ModelSerializer):
         model = CardInColumn
         fields = ['id', 'card_id', 'column_id', 'position_in_column']
 
-
-# class CardSerializer(serializers.ModelSerializer):
-#     column_id = serializers.SerializerMethodField()  # Получаем column_id через метод
-#     position_in_column = serializers.SerializerMethodField()  # Получаем position_in_column через метод
-#     date_time_start = serializers.DateTimeField(required=False)
-#     date_time_finish = serializers.DateTimeField(required=False)
-#     date_time_reminder = serializers.DateTimeField(required=False)
-#     created = serializers.DateTimeField(required=False)
-#     updated = serializers.DateTimeField(required=False)
-#     header_image = serializers.ImageField(required=False)
-#     card_in_columns = CardInColumnSerializer(many=True, read_only=True, required=False)
-#
-#     class Meta:
-#         model = Card
-#         fields = '__all__'
-#
-#     def get_column_id(self, obj):
-#         # Предполагаем, что карточка может быть привязана к одной колонке
-#         card_in_column = obj.card_in_columns.first()  # Берем первую колонку
-#         if card_in_column:
-#             return card_in_column.column.id  # Возвращаем ID колонки
-#         return None
-#
-#     def get_position_in_column(self, obj):
-#         # Предполагаем, что карточка может быть привязана к одной колонке
-#         card_in_column = obj.card_in_columns.first()
-#         if card_in_column:
-#             return card_in_column.position_in_column  # Возвращаем позицию карточки в колонке
-#         return None
 
 class CardSerializer(serializers.ModelSerializer):
     column_id = serializers.SerializerMethodField()  # Получаем column_id через метод
@@ -118,16 +85,82 @@ class ColumnSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ChipSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Chip
-        fields = '__all__'
-
-
 class ColorSerializer(serializers.ModelSerializer):
+    """Сериализатор для цветов"""
+
+    # Поля для совместимости с фронтендом
+    normal = serializers.CharField(source='normal_color', read_only=True)
+    hover = serializers.CharField(source='hover_color', read_only=True)
+    colorNumber = serializers.IntegerField(source='color_number', read_only=True)
+    colorName = serializers.CharField(source='color_name', read_only=True)
+    isDark = serializers.BooleanField(source='is_dark', read_only=True)
+    textColor = serializers.CharField(source='text_color', read_only=True)
+
     class Meta:
         model = Color
-        fields = '__all__'
+        fields = [
+            'id', 'color_number', 'normal_color', 'hover_color',
+            'color_name', 'is_dark', 'text_color',
+            # Поля для совместимости
+            'normal', 'hover', 'colorNumber', 'colorName', 'isDark', 'textColor'
+        ]
+
+
+class ChipSerializer(serializers.ModelSerializer):
+    """Сериализатор для чипа с полной информацией о цвете"""
+    color = ColorSerializer(read_only=True)
+    color_id = serializers.IntegerField(write_only=True)
+
+    # Поля для совместимости
+    text = serializers.CharField(source='name')
+    color_number = serializers.IntegerField(source='color.color_number', read_only=True)
+
+    class Meta:
+        model = Chip
+        fields = [
+            'id', 'name', 'color', 'color_id', 'created', 'updated',
+            # Поля для совместимости
+            'text', 'color_number'
+        ]
+
+    def update(self, instance, validated_data):
+        """Обновление чипа с возвратом полных данных"""
+        if 'color_id' in validated_data:
+            color_id = validated_data.pop('color_id')
+            instance.color = Color.objects.get(id=color_id)
+
+        if 'name' in validated_data:
+            instance.name = validated_data['name']
+
+        instance.save()
+        return instance
+
+    def to_representation(self, instance):
+        """Возвращаем полные данные, включая цвет"""
+        data = super().to_representation(instance)
+
+        # Убеждаемся, что цвет включен в ответ
+        if instance.color:
+            data['color'] = ColorSerializer(instance.color).data
+
+        return data
+
+
+class ChipDetailSerializer(serializers.ModelSerializer):
+    """Детальный сериализатор для чипа с полной информацией о цвете"""
+    color = ColorSerializer(read_only=True)
+
+    # Поля для совместимости со старым API
+    text = serializers.CharField(source='name', read_only=True)
+    color_number = serializers.IntegerField(source='color.color_number', read_only=True)
+
+    class Meta:
+        model = Chip
+        fields = [
+            'id', 'name', 'color', 'created', 'updated',
+            # Поля для совместимости
+            'text', 'color_number'
+        ]
 
 
 class CommentSerializer(serializers.ModelSerializer):

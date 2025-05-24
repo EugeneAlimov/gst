@@ -27,6 +27,7 @@ export const cardsApi = createApi({
           ? [...result.map(({ id }) => ({ type: "cards", id })), { type: "cards", id: "LIST" }]
           : [{ type: "cards", id: "LIST" }],
     }),
+
     createNewCard: builder.mutation({
       query: (cardTemplate) => ({
         url: `/card/`,
@@ -40,16 +41,22 @@ export const cardsApi = createApi({
       query: (cardId) => ({
         url: `/card/${cardId}/`,
       }),
-      providesTags: ["cards"],
+      providesTags: (result, error, cardId) => [{ type: "cards", id: cardId }],
     }),
+
     updateCardDetail: builder.mutation({
       query: ({ id, ...patchData }) => ({
         url: `/card/${id}/`,
         method: "PATCH",
         body: { ...patchData },
       }),
-      invalidatesTags: [{ type: "cards", id: "LIST" }],
+      // Инвалидируем теги сразу после успешного обновления
+      invalidatesTags: (result, error, { id }) => [
+        { type: "cards", id },
+        { type: "cards", id: "LIST" },
+      ],
     }),
+
     updateCardInColumn: builder.mutation({
       query: ({ target_column_id, cards }) => ({
         url: `/card/update-positions/`,

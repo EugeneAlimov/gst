@@ -1,9 +1,13 @@
-from django.contrib.auth.models import AbstractUser, PermissionsMixin
-from django.db import models
-
-
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.core.validators import RegexValidator
+
+# Валидатор для HEX-цветов
+hex_color_validator = RegexValidator(
+    regex=r'^#(?:[0-9a-fA-F]{3}){1,2}$',
+    message='Введите корректный HEX-цвет в формате #RGB или #RRGGBB'
+)
+
 
 class UserProfile(AbstractUser):
     """
@@ -32,6 +36,7 @@ class UserProfile(AbstractUser):
 
     def __str__(self):
         return self.username
+
 
 class Board(models.Model):
     """
@@ -121,6 +126,7 @@ class BoardMembership(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.board.name} ({self.get_role_display()})"
 
+
 class Column(models.Model):
     """
     Колонка на канбан-доске, содержит карточки.
@@ -161,16 +167,17 @@ class Card(models.Model):
     """
     Карточка задачи.
     """
-    name = models.CharField(max_length=255, blank=True, null=True, verbose_name='Название карточки')  # Используем name вместо title для совместимости
+    name = models.CharField(max_length=255, blank=True, null=True,
+                            verbose_name='Название карточки')  # Используем name вместо title для совместимости
     assigned_users = models.ManyToManyField(UserProfile, blank=True, related_name='assigned_cards',
-                                            verbose_name='Назначенные пользователи') # Название из админки
+                                            verbose_name='Назначенные пользователи')  # Название из админки
     description = models.TextField(blank=True, verbose_name='Описание')
     board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='cards', verbose_name='Доска')
     chips = models.ManyToManyField('Chip', blank=True, related_name='cards', verbose_name='Метки/Чипы')
-    is_completed = models.BooleanField(default=False, verbose_name='Выполнено') # Поле из админки
-    is_archived = models.BooleanField(default=False, verbose_name='Архивная') # Поле из админки
-    created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания') # Сохраняем названия
-    updated = models.DateTimeField(auto_now=True, verbose_name='Дата обновления') # Сохраняем названия
+    is_completed = models.BooleanField(default=False, verbose_name='Выполнено')  # Поле из админки
+    is_archived = models.BooleanField(default=False, verbose_name='Архивная')  # Поле из админки
+    created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')  # Сохраняем названия
+    updated = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')  # Сохраняем названия
     # Дополнительные поля, которые могут быть полезны
     due_date = models.DateTimeField(null=True, blank=True, verbose_name='Срок выполнения')
     reminder_date = models.DateTimeField(null=True, blank=True, verbose_name='Напоминание')
@@ -193,8 +200,10 @@ class CardInColumn(models.Model):
     """
     Положение карточки в колонке.
     """
-    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='card_in_columns', verbose_name='Карточка')# Сохраняем имя для совместимости
-    column = models.ForeignKey(Column, on_delete=models.CASCADE, related_name='card_in_columns', verbose_name='Колонка') # Сохраняем имя для совместимости
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='card_in_columns',
+                             verbose_name='Карточка')  # Сохраняем имя для совместимости
+    column = models.ForeignKey(Column, on_delete=models.CASCADE, related_name='card_in_columns',
+                               verbose_name='Колонка')  # Сохраняем имя для совместимости
     position_in_column = models.PositiveIntegerField(default=0, verbose_name='Позиция в колонке')
     is_archived = models.BooleanField(default=False, verbose_name='Архивная')
 
@@ -213,7 +222,7 @@ class Comment(models.Model):
     Комментарий к карточке.
     """
     card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='comments', verbose_name='Карточка')
-    text = models.TextField(verbose_name='Комментарий') # Сохраняем имя поля
+    text = models.TextField(verbose_name='Комментарий')  # Сохраняем имя поля
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     updated = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
 
@@ -226,39 +235,124 @@ class Comment(models.Model):
         return self.text
 
 
-class Chip(models.Model):
+class Color(models.Model):
     """
-    Метка/чип для карточек.
+    Модель для хранения цветовых схем для чипов.
+    Каждый цвет имеет нормальное состояние и состояние при наведении.
     """
-    name = models.CharField(max_length=50, verbose_name='Название чипа')
-    color = models.CharField(max_length=7, default='#FFFFFF', verbose_name='Цвет чипа')
-    text = models.CharField(max_length=500, blank=True, null=True, verbose_name='Текст чипа') # Поле для обратной совместимости
+    # Уникальный числовой идентификатор цвета (соответствует colorNumber из фронтенда)
+    color_number = models.IntegerField(
+        unique=True,
+        blank=True,
+        verbose_name='Номер цвета',
+        help_text='Уникальный числовой идентификатор цвета из палитры'
+    )
+
+    # Основной цвет (нормальное состояние)
+    normal_color = models.CharField(
+        max_length=7,
+        blank=True,
+        validators=[hex_color_validator],
+        verbose_name='Нормальный цвет',
+        help_text='HEX-код цвета в нормальном состоянии'
+    )
+
+    # Цвет при наведении
+    hover_color = models.CharField(
+        max_length=7,
+        blank=True,
+        validators=[hex_color_validator],
+        verbose_name='Цвет при наведении',
+        help_text='HEX-код цвета при наведении курсора'
+    )
+
+    # Название цвета для отображения пользователю
+    color_name = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Название цвета',
+        help_text='Человекочитаемое название цвета'
+    )
+
+    # Дополнительные свойства для улучшения UX
+    is_dark = models.BooleanField(
+        default=False,
+        verbose_name='Темный цвет',
+        help_text='Определяет, является ли цвет темным (для выбора цвета текста)'
+    )
+
+    text_color = models.CharField(
+        max_length=7,
+        default='#000000',
+        validators=[hex_color_validator],
+        verbose_name='Цвет текста',
+        help_text='HEX-код цвета текста для обеспечения контрастности'
+    )
+
+    # Поля для аудита
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     updated = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
 
     class Meta:
-        verbose_name = 'Чип'
-        verbose_name_plural = 'Чипы'
+        verbose_name = 'Цвет'
+        verbose_name_plural = 'Цвета'
+        ordering = ['color_number']
+
+    def __str__(self):
+        return f"{self.color_name} (#{self.color_number})"
+
+    def save(self, *args, **kwargs):
+        """
+        Автоматически определяем, темный ли цвет, и устанавливаем соответствующий цвет текста
+        """
+        if not self.text_color or self.text_color == '#000000':
+            # Определяем яркость цвета
+            self.is_dark = self._is_color_dark(self.normal_color)
+            self.text_color = '#FFFFFF' if self.is_dark else '#000000'
+
+        super().save(*args, **kwargs)
+
+    def _is_color_dark(self, hex_color):
+        """
+        Определяет, является ли цвет темным на основе его яркости
+        """
+        # Убираем # в начале
+        hex_color = hex_color.lstrip('#')
+
+        # Конвертируем в RGB
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+
+        # Вычисляем относительную яркость по формуле W3C
+        # https://www.w3.org/WAI/GL/wiki/Relative_luminance
+        luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+
+        # Если яркость меньше 0.5, считаем цвет темным
+        return luminance < 0.5
+
+
+class Chip(models.Model):
+    """
+    Метка/чип для карточек с привязкой к цветовой схеме
+    """
+    name = models.CharField(max_length=50, verbose_name='Название метки')
+
+    # Связь с цветовой схемой
+    color = models.ForeignKey(Color, on_delete=models.PROTECT,  # Защищаем от случайного удаления цветов
+                              related_name='chips', verbose_name='Цветовая схема')
+
+    # Поля для аудита
+    created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    updated = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
+
+    class Meta:
+        verbose_name = 'Метка'
+        verbose_name_plural = 'Метки'
+        ordering = ['name']
 
     def __str__(self):
         return self.name
-
-
-class Color(models.Model):
-    """
-    Цвета для интерфейса.
-    """
-    color = models.CharField(max_length=500, blank=True, null=True, default=None, verbose_name='Color')
-    hover_color = models.CharField(max_length=500, blank=True, null=True, default=None, verbose_name='Hover color')
-    color_name = models.CharField(max_length=500, blank=True, null=True, default=None, verbose_name='Color name')
-    color_number = models.IntegerField(blank=True, null=True, default=None, verbose_name='Color number')
-
-    class Meta:
-        verbose_name = 'Color'
-        verbose_name_plural = 'Colors'
-
-    def __str__(self):
-        return f"{self.color}"
 
 
 class ChecklistItem(models.Model):
@@ -266,7 +360,8 @@ class ChecklistItem(models.Model):
     Элемент чеклиста в карточке.
     """
     card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='checklist_items', verbose_name='Карточка')
-    description = models.CharField(max_length=255, verbose_name='Описание пункта') # Используем description вместо text для совместимости
+    description = models.CharField(max_length=255,
+                                   verbose_name='Описание пункта')  # Используем description вместо text для совместимости
     is_checked = models.BooleanField(default=False, verbose_name='Отмечено')  # Обратная совместимость
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     updated = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')

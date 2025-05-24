@@ -12,7 +12,6 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from .serializers import *
 
 
-
 class UserViewSet(viewsets.ModelViewSet):
     """
     Работа с данными текущего пользователя.
@@ -68,11 +67,13 @@ class BoardMembershipViewSet(viewsets.ViewSet):
 
         # Проверяем, существует ли уже связь
         if BoardMembership.objects.filter(board=board, user=user).exists():
-            return Response({'error': 'Этот пользователь уже является участником доски.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Этот пользователь уже является участником доски.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         # Создаем связь
         BoardMembership.objects.create(board=board, user=user, role=role)
-        return Response({'message': f'Пользователь {user.username} добавлен с ролью {role}.'}, status=status.HTTP_201_CREATED)
+        return Response({'message': f'Пользователь {user.username} добавлен с ролью {role}.'},
+                        status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='remove-member')
     def remove_member(self, request, pk=None):
@@ -89,7 +90,8 @@ class BoardMembershipViewSet(viewsets.ViewSet):
         # Удаляем связь
         membership = BoardMembership.objects.filter(board=board, user=user).first()
         if not membership:
-            return Response({'error': 'Этот пользователь не является участником доски.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Этот пользователь не является участником доски.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         membership.delete()
         return Response({'message': f'Пользователь {user.username} удален с доски.'}, status=status.HTTP_204_NO_CONTENT)
@@ -101,7 +103,8 @@ class BoardMembershipViewSet(viewsets.ViewSet):
         """
         board = get_object_or_404(Board, pk=pk)
         if board.user != request.user:
-            return Response({'error': 'У вас нет прав на изменение ролей участников.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'У вас нет прав на изменение ролей участников.'},
+                            status=status.HTTP_403_FORBIDDEN)
 
         user_id = request.data.get('user_id')
         role = request.data.get('role')
@@ -111,7 +114,8 @@ class BoardMembershipViewSet(viewsets.ViewSet):
         user = get_object_or_404(UserProfile, pk=user_id)
         membership = BoardMembership.objects.filter(board=board, user=user).first()
         if not membership:
-            return Response({'error': 'Этот пользователь не является участником доски.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Этот пользователь не является участником доски.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         membership.role = role
         membership.save()
@@ -291,7 +295,7 @@ class ColumnsOnBoardViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         return Response({"error": "No columns found for this board"}, status=status.HTTP_404_NOT_FOUND)
 
-    
+
 class CardInColumnViewSet(viewsets.ModelViewSet):
     queryset = CardInColumn.objects.all()
     serializer_class = CardInColumnSerializer
@@ -508,16 +512,103 @@ class CardViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+class ColorViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet для работы с цветами
+    """
+    queryset = Color.objects.all().order_by('color_number')
+    serializer_class = ColorSerializer
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['get'])
+    def palette(self, request):
+        """
+        Возвращает цвета в формате, совместимом с фронтендом
+        """
+        colors = self.get_queryset()
+        palette_data = []
+
+        for color in colors:
+            palette_data.append({
+                'id': color.id,
+                'colorNumber': color.color_number,
+                'normal': color.normal_color,
+                'hover': color.hover_color,
+                'colorName': color.color_name,
+                'isDark': color.is_dark,
+                'textColor': color.text_color
+            })
+
+        return Response(palette_data)
+
+
 class ChipViewSet(viewsets.ModelViewSet):
+    """ViewSet для работы с чипами"""
     queryset = Chip.objects.all()
     serializer_class = ChipSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = [IsAuthenticated]
 
+    def create(self, request, *args, **kwargs):
+        """Создание нового чипа"""
+        print("Received data:", request.data)  # Для отладки
 
-class ColorViewSet(viewsets.ModelViewSet):
-    queryset = Color.objects.all()
-    serializer_class = ColorSerializer
-    permission_classes = (IsAuthenticated,)
+        # Подготавливаем данные для сериализатора
+        data = {}
+
+        # Обрабатываем название чипа
+        name = request.data.get('name') or request.data.get('text', '').strip()
+        if not name:
+            return Response(
+                {'error': 'Необходимо указать название чипа'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        data['name'] = name
+
+        # Обрабатываем color_id
+        color_id = request.data.get('color_id')
+        if not color_id:
+            return Response(
+                {'error': 'Необходимо указать color_id'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        data['color_id'] = color_id
+
+        # Создаем сериализатор с подготовленными данными
+        serializer = self.get_serializer(data=data)
+
+        if serializer.is_valid():
+            chip = serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            print("Validation errors:", serializer.errors)  # Для отладки
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        """Обновление чипа"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        # Подготавливаем данные для сериализатора
+        data = {}
+
+        # Обрабатываем название чипа
+        name = request.data.get('name') or request.data.get('text')
+        if name:
+            data['name'] = name.strip()
+
+        # Обрабатываем color_id
+        color_id = request.data.get('color_id')
+        if color_id:
+            data['color_id'] = color_id
+
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+
+        if serializer.is_valid():
+            chip = serializer.save()
+            return Response(serializer.data)
+        else:
+            print("Update validation errors:", serializer.errors)  # Для отладки
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CommentViewSet(viewsets.ModelViewSet):

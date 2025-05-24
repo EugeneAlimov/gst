@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { chipData, popUpToOpen, targetChipData } from "../../Redux/chip/chip-slice";
 
-//import MIU components
+//import MUI components
 import Card from "@mui/material/Card";
 import CardHeader from "@mui/material/CardHeader";
 import Box from "@mui/material/Box";
@@ -18,55 +18,82 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 
-//import MIU icons
+//import MUI icons
 import ArrowBackIosNewOutlinedIcon from "@mui/icons-material/ArrowBackIosNewOutlined";
 
 //import components
 import ChangeChip from "./ChangeChip";
 import CardChip from "../Card/CardChipsSection/CardChip";
 
-//import const
-import { chipColor } from "../../constants/colorsConst";
-import { chipStyleCreateNewChip, chipStyleChipContainer } from "../../constants/chipContainerStyle";
+//import API hooks
 import {
   useCreateNewChipMutation,
   useDeleteChipMutation,
   useUpdateChipMutation,
 } from "../../Redux/chip/chip-operations";
+import { useGetColorPaletteQuery } from "../../Redux/chip/chip-operations";
 
-const defaultChipColor = {
-  ...chipColor[0],
-};
+//import styles
+import { chipStyleCreateNewChip, chipStyleChipContainer } from "../../constants/chipContainerStyle";
 
-const arrowBackIconButtonStyle = {
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  position: "absolute",
-  top: "13px",
-  left: "4px",
-  width: "40px",
-  height: "40px",
-};
-
-export default function CreateNewChip({ id }) {
+export default function CreateNewChip({ id, onChipCreated }) {
   const [chipUpdate] = useUpdateChipMutation();
   const [chipDelete] = useDeleteChipMutation();
+  const [createNewChip] = useCreateNewChipMutation();
+
+  // Загружаем палитру цветов с сервера
+  const {
+    data: colorPalette,
+    isLoading: colorsLoading,
+    error: colorsError,
+  } = useGetColorPaletteQuery();
 
   const chipDataFromState = useSelector(chipData);
   const { targetChipId, targetChipText, targetChipColor, isEdit } = chipDataFromState;
 
   const dispatch = useDispatch();
 
-  const innitialChipText = isEdit ? targetChipText : "";
-  const innitialChipColor = isEdit ? targetChipColor : defaultChipColor;
+  const [newChipColor, setNewChipColor] = useState(null);
+  const [newChipText, setNewChipText] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
 
+  // Инициализация при загрузке компонента
+  useEffect(() => {
+    if (colorPalette && colorPalette.length > 0) {
+      if (isEdit && targetChipColor && targetChipColor.id) {
+        console.log("Editing chip, target color:", targetChipColor); // Для отладки
 
-  const [newChipColor, setNewChipColor] = useState(innitialChipColor);
-  const [newChipText, setNewChipText] = useState(innitialChipText);
-  const [dialogOpen, setDialogOpen] = React.useState(false);
+        // Ищем цвет в палитре по ID
+        const existingColor = colorPalette.find((color) => color.id === targetChipColor.id);
 
-  const [createNewChip] = useCreateNewChipMutation();
+        if (existingColor) {
+          setNewChipColor(existingColor);
+        } else {
+          // Если не нашли по ID, ищем по номеру цвета
+          const colorByNumber = colorPalette.find(
+            (color) => color.colorNumber === targetChipColor.colorNumber
+          );
+          setNewChipColor(colorByNumber || colorPalette[0]);
+        }
+
+        setNewChipText(targetChipText || "");
+      } else {
+        // Если создаем новый, берем первый цвет
+        setNewChipColor(colorPalette[0]);
+        setNewChipText("");
+      }
+    }
+  }, [colorPalette, isEdit, targetChipColor, targetChipText]);
+
+  // Сброс состояния при изменении режима (создание/редактирование)
+  useEffect(() => {
+    if (!isEdit) {
+      setNewChipText("");
+      if (colorPalette && colorPalette.length > 0) {
+        setNewChipColor(colorPalette[0]);
+      }
+    }
+  }, [isEdit, colorPalette]);
 
   const handleDialogOpen = () => {
     setDialogOpen(true);
@@ -77,53 +104,108 @@ export default function CreateNewChip({ id }) {
   };
 
   const goToChangeChipPallet = () => {
-    setNewChipColor(defaultChipColor);
-    setNewChipText("");
+    // Сброс состояния и возврат к списку
+    dispatch(targetChipData({ isEdit: false }));
     dispatch(popUpToOpen(1));
-    dispatch(targetChipData({isEdit: false}));
-}
+  };
 
   const chipHandler = async () => {
-    const newChipObj = {
-      text: newChipText,
-      color_number: newChipColor.colorNumber,
-      card: [id],
+    if (!newChipText.trim() || !newChipColor) {
+      console.error("Необходимо указать название и цвет чипа");
+      return;
+    }
+
+    const chipData = {
+      name: newChipText.trim(),
+      text: newChipText.trim(),
+      color_id: newChipColor.id,
     };
-    const updateChipObj = {
-      text: newChipText,
-      color_number: newChipColor.colorNumber,
+
+    const updateChipData = {
+      name: newChipText.trim(),
+      text: newChipText.trim(),
+      color_id: newChipColor.id,
     };
+
     try {
-      !isEdit && (await createNewChip(newChipObj));
-      isEdit && (await chipUpdate({ chipId: targetChipId, updateChipObj }));
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setNewChipColor(defaultChipColor);
-      setNewChipText("");
+      if (!isEdit) {
+        await createNewChip(chipData).unwrap();
+        console.log("Chip created successfully");
+      } else {
+        await chipUpdate({
+          chipId: targetChipId,
+          updateChipObj: updateChipData,
+        }).unwrap();
+        console.log("Chip updated successfully");
+      }
+
+      // Сброс формы и возврат к списку
+      dispatch(targetChipData({ isEdit: false }));
       dispatch(popUpToOpen(1));
-      dispatch(targetChipData({isEdit: false}));
+
+      // Уведомляем о завершении операции
+      if (onChipCreated) {
+        setTimeout(onChipCreated, 200);
+      }
+    } catch (error) {
+      console.error("Ошибка при сохранении чипа:", error);
     }
   };
 
   const chipDeleter = async () => {
     handleDialogClose();
     try {
-      chipDelete(targetChipId);
+      await chipDelete(targetChipId).unwrap();
     } catch (error) {
-      console.log(error);
+      console.error("Ошибка при удалении чипа:", error);
     } finally {
-      setNewChipColor(defaultChipColor);
-      setNewChipText("");
+      dispatch(targetChipData({ isEdit: false }));
       dispatch(popUpToOpen(1));
-      dispatch(targetChipData({isEdit: false}));
-
     }
   };
 
-  const setNewChipColorHandle = (value) => {
-    setNewChipColor(value);
+  const setNewChipColorHandle = (color) => {
+    console.log("Color selected:", color); // Для отладки
+    setNewChipColor(color);
   };
+
+  // Показываем ошибку
+  if (colorsError) {
+    return (
+      <Card
+        sx={{
+          display: "block",
+          position: "relative",
+          width: "300px",
+          height: "200px",
+          paddingX: "12px",
+        }}
+      >
+        <Typography sx={{ padding: "20px", textAlign: "center", color: "red" }}>
+          Ошибка загрузки палитры цветов
+        </Typography>
+      </Card>
+    );
+  }
+
+  // Показываем загрузку
+  if (colorsLoading || !colorPalette) {
+    return (
+      <Card
+        sx={{
+          display: "block",
+          position: "relative",
+          width: "300px",
+          height: "200px",
+          paddingX: "12px",
+        }}
+      >
+        <Typography sx={{ padding: "20px", textAlign: "center" }}>
+          Загружаем палитру цветов...
+        </Typography>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -141,7 +223,6 @@ export default function CreateNewChip({ id }) {
             display: "flex",
             flexDirection: "Column",
             alignItems: "center",
-
             padding: "5px",
             marginTop: "5px",
             marginBottom: "10px",
@@ -152,17 +233,25 @@ export default function CreateNewChip({ id }) {
           }}
           title={isEdit ? "Изменить метку" : "Создать новую метку"}
           action={
-            <>
-              <IconButton
-                aria-label="Create-new-Chips-Pallet"
-                sx={arrowBackIconButtonStyle}
-                onClick={goToChangeChipPallet}
-              >
-                <ArrowBackIosNewOutlinedIcon sx={{ fontSize: "18px" }} />
-              </IconButton>
-            </>
+            <IconButton
+              aria-label="back-to-list"
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                position: "absolute",
+                top: "13px",
+                left: "4px",
+                width: "40px",
+                height: "40px",
+              }}
+              onClick={goToChangeChipPallet}
+            >
+              <ArrowBackIosNewOutlinedIcon sx={{ fontSize: "18px" }} />
+            </IconButton>
           }
         />
+
         <CardActions
           disableSpacing
           sx={{
@@ -172,41 +261,39 @@ export default function CreateNewChip({ id }) {
             width: "100%",
           }}
         >
-          <Divider
-            variant="middle"
-            sx={{
-              width: "250px",
-              marginY: "10px",
-            }}
-            component="div"
-          />
-          <CardChip
-            chipText={newChipText}
-            color={newChipColor}
-            chipStyle={chipStyleChipContainer}
-          />
-          <Divider
-            variant="middle"
-            sx={{
-              width: "250px",
-              marginY: "10px",
-            }}
-          />
+          <Divider variant="middle" sx={{ width: "250px", marginY: "10px" }} />
+
+          {/* Предпросмотр чипа */}
+          {newChipColor && (
+            <CardChip
+              chip={{
+                name: newChipText || "Предпросмотр",
+                color: {
+                  normal: newChipColor.normal || newChipColor.normal_color,
+                  hover: newChipColor.hover || newChipColor.hover_color,
+                  colorName: newChipColor.colorName || newChipColor.color_name,
+                },
+              }}
+              chipStyle={chipStyleChipContainer}
+            />
+          )}
+
+          <Divider variant="middle" sx={{ width: "250px", marginY: "10px" }} />
+
+          {/* Поле ввода названия */}
           <TextField
             label="Название"
             id="new-name-chip"
             size="small"
             autoFocus={true}
-            sx={{
-              width: "260px",
-              marginBottom: "15px",
-            }}
+            sx={{ width: "260px", marginBottom: "15px" }}
             value={newChipText}
             onChange={(event) => setNewChipText(event.target.value)}
           />
 
           <Typography>Цвет</Typography>
 
+          {/* Палитра цветов */}
           <Box
             sx={{
               display: "flex",
@@ -220,22 +307,20 @@ export default function CreateNewChip({ id }) {
               marginBottom: "16px",
             }}
           >
-            {[
-              0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-              24, 25, 26, 27, 28, 29,
-            ].map((value) => {
-              return (
-                <ChangeChip
-                  setNewChipColorHandle={setNewChipColorHandle}
-                  key={chipColor[value].colorNumber}
-                  chipStyle={chipStyleCreateNewChip}
-                  color={chipColor[value]}
-                />
-              );
-            })}
+            {colorPalette.map((color) => (
+              <ChangeChip
+                key={color.id}
+                setNewChipColorHandle={setNewChipColorHandle}
+                color={color}
+                chipStyle={chipStyleCreateNewChip}
+                isSelected={newChipColor?.id === color.id}
+              />
+            ))}
           </Box>
+
+          {/* Кнопки действий */}
           <Button
-            disabled={newChipText.length === 0}
+            disabled={!newChipText.trim() || !newChipColor}
             variant="contained"
             sx={{
               width: "100%",
@@ -247,11 +332,16 @@ export default function CreateNewChip({ id }) {
               "&:hover": {
                 backgroundColor: "#e3e3e3",
               },
+              "&:disabled": {
+                backgroundColor: "#f5f5f5",
+                color: "#999",
+              },
             }}
             onClick={chipHandler}
           >
             {isEdit ? "Изменить метку" : "Создать метку"}
           </Button>
+
           {isEdit && (
             <Button
               variant="contained"
@@ -260,7 +350,6 @@ export default function CreateNewChip({ id }) {
                 height: "32px",
                 fontSize: "14px",
                 marginBottom: "10px",
-                // backgroundColor: "",
                 color: "#172b4d",
                 "&:hover": {
                   backgroundColor: "#e3e3e3",
@@ -273,6 +362,8 @@ export default function CreateNewChip({ id }) {
           )}
         </CardActions>
       </Card>
+
+      {/* Диалог подтверждения удаления */}
       <Dialog
         open={dialogOpen}
         onClose={handleDialogClose}
@@ -280,8 +371,17 @@ export default function CreateNewChip({ id }) {
         aria-describedby="alert-dialog-description"
       >
         <IconButton
-          aria-label="Create-new-Chips-Pallet"
-          sx={arrowBackIconButtonStyle}
+          aria-label="close-dialog"
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            position: "absolute",
+            top: "13px",
+            left: "4px",
+            width: "40px",
+            height: "40px",
+          }}
           onClick={handleDialogClose}
         >
           <ArrowBackIosNewOutlinedIcon sx={{ fontSize: "18px" }} />

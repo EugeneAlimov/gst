@@ -1,3 +1,4 @@
+// src/Redux/chip/chip-operations.js
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { baseURL } from "../axiosDefaults";
 
@@ -15,44 +16,58 @@ export const chipsApi = createApi({
     },
   }),
   endpoints: (builder) => ({
-    // providesTags: (result) =>
-    //   result
-    //     ? [...result.map(({ id }) => ({ type: "chips", id })), { type: "chips", id: "LIST" }]
-    //     : [{ type: "chips", id: "LIST" }],
     getChips: builder.query({
-      query: (id) => ({
+      query: (cardId) => ({
         url: `/chip/`,
-        params: {
-          card: id,
-        },
+        params: cardId ? { card: cardId } : undefined,
       }),
       providesTags: (result) =>
         result
           ? [...result.map(({ id }) => ({ type: "chips", id })), { type: "chips", id: "LIST" }]
           : [{ type: "chips", id: "LIST" }],
-      // providesTags: ["chips"],
     }),
+
     getAllChips: builder.query({
       query: () => ({
         url: `/chip/`,
       }),
+      providesTags: (result) =>
+        result
+          ? [...result.map(({ id }) => ({ type: "chips", id })), { type: "chips", id: "LIST" }]
+          : [{ type: "chips", id: "LIST" }],
     }),
+
     createNewChip: builder.mutation({
       query: (newChip) => ({
         url: `/chip/`,
         method: "POST",
-        body: { ...newChip },
+        body: {
+          name: newChip.text || newChip.name,
+          color_id: newChip.color_id,
+          text: newChip.text || newChip.name,
+          color_number: newChip.color_number,
+        },
       }),
       invalidatesTags: [{ type: "chips", id: "LIST" }],
     }),
+
     updateChip: builder.mutation({
       query: ({ chipId, updateChipObj }) => ({
         url: `/chip/${chipId}/`,
         method: "PATCH",
-        body: { ...updateChipObj },
+        body: {
+          name: updateChipObj.name || updateChipObj.text,
+          text: updateChipObj.name || updateChipObj.text,
+          color_id: updateChipObj.color_id,
+        },
       }),
-      invalidatesTags: [{ type: "chips", id: "LIST" }],
+      // Простая инвалидация - пусть RTK Query сам обновляет кэш
+      invalidatesTags: [
+        { type: "chips", id: "LIST" },
+        "chips", // Инвалидируем все чипы
+      ],
     }),
+
     deleteChip: builder.mutation({
       query: (chipId) => ({
         url: `/chip/${chipId}/`,
@@ -63,10 +78,43 @@ export const chipsApi = createApi({
   }),
 });
 
+// Создаем отдельный API для цветов
+export const colorsApi = createApi({
+  reducerPath: "colorsApi",
+  tagTypes: ["colors"],
+  baseQuery: fetchBaseQuery({
+    baseUrl: `${baseURL}`,
+    prepareHeaders: (headers, { getState }) => {
+      const token = getState().auth?.accessToken || localStorage.getItem("access_token");
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+      return headers;
+    },
+  }),
+  endpoints: (builder) => ({
+    getColors: builder.query({
+      query: () => ({
+        url: `/color/`,
+      }),
+      providesTags: ["colors"],
+    }),
+
+    getColorPalette: builder.query({
+      query: () => ({
+        url: `/color/palette/`,
+      }),
+      providesTags: ["colors"],
+    }),
+  }),
+});
+
 export const {
   useGetChipsQuery,
-  useUpdateChipMutation,
   useCreateNewChipMutation,
-  useGetAllChipsQuery,
+  useUpdateChipMutation,
   useDeleteChipMutation,
+  useGetAllChipsQuery,
 } = chipsApi;
+
+export const { useGetColorsQuery, useGetColorPaletteQuery } = colorsApi;

@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useDispatch } from "react-redux";
-
 import { popUpToOpen } from "../../Redux/chip/chip-slice";
 
 //import MUI components
@@ -18,27 +17,23 @@ import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 //import components
 import ChipContainer from "./ChipContainer";
 
-// import constants
-// import { chipColor } from "../../constants/colorsConst";
 import { useGetAllChipsQuery } from "../../Redux/chip/chip-operations";
-import { cardsApi, useUpdateCardDetailMutation } from "../../Redux/cards/cards-operations";
 
-export default function ChangeChipsPallet({ cardId, chipsArr }) {
+export default function ChangeChipsPallet({ cardId, chipsArr, onChipsUpdate }) {
   const { data: chips } = useGetAllChipsQuery();
-  const [updateCard] = useUpdateCardDetailMutation();
-
   const dispatch = useDispatch();
 
   const [buttonsState, setButtonsState] = useState(1);
-  const [chipList, setChipList] = useState([]);
   const [searchText, setSearchText] = useState("");
 
-  useEffect(() => {
+  // Мемоизируем обработку списка чипов
+  const chipList = useMemo(() => {
+    if (!chips) return [];
+
     let arr = JSON.parse(JSON.stringify(chips));
 
-    const newArr = arr.reduce((accumulator, item) => {
+    return arr.reduce((accumulator, item) => {
       item.checked = false;
-
       chipsArr.forEach((el) => {
         if (el.id === item.id) item.checked = true;
       });
@@ -57,104 +52,76 @@ export default function ChangeChipsPallet({ cardId, chipsArr }) {
           default:
             break;
         }
-      }
-      if (searchText !== "") {
-        item.text.includes(searchText) && accumulator.push(item);
+      } else {
+        if (item.name?.includes(searchText) || item.text?.includes(searchText)) {
+          accumulator.push(item);
+        }
       }
       return accumulator;
     }, []);
-
-    setChipList(newArr);
   }, [buttonsState, chipsArr, chips, searchText]);
 
-  // const chipRelateToCardUpdate = async (chipId) => {
-  //   let arr = JSON.parse(JSON.stringify(chipsArr));
-  //   let newArr = [];
+  //функция обновления чипов
+  const chipRelateToCardUpdate = useCallback(
+    async (chipId) => {
+      let updatedChipsArr = [...chipsArr];
 
-  //   chipList.forEach((element) => {
-  //     if (element.id === chipId) {
-  //       if (element.checked) {
-  //         newArr = [...arr.filter((el) => el.id !== chipId)];
-  //       }
-  //       if (!element.checked) {
-  //         arr.push(chips[chips.findIndex((el) => el.id === chipId)]);
-  //         newArr = [...arr];
-  //       }
-  //     }
-  //   });
+      const targetChip = chipList.find((element) => element.id === chipId);
+      if (!targetChip) return;
 
-  //   const finalArr = newArr.map((el) => {
-  //     return el.id;
-  //   });
-
-  //   const chipsObj = { id: cardId, chips: finalArr };
-  //     dispatch(
-  //       cardsApi.util.updateQueryData("getCards", cardId, (draft) => {
-  //         const card = draft.find((c) => c.id === cardId);
-  //         if (card) {
-  //           card.chips = finalArr; // Обновляем только chips
-  //         }
-  //       })
-  //     );
-  //   try {
-  //     await updateCard(chipsObj)
-  //   } catch (error) {
-  //     console.log(error);
-  //   }
-  // };
-
-  const chipRelateToCardUpdate = async (chipId) => {
-    // Создаем копию массива chipsArr
-    let updatedChipsArr = [...chipsArr];
-  
-    // Ищем элемент в chipList и обновляем массив
-    chipList.forEach((element) => {
-      if (element.id === chipId) {
-        if (element.checked) {
-          // Убираем chip из массива
-          updatedChipsArr = updatedChipsArr.filter((el) => el.id !== chipId);
-        } else {
-          // Добавляем chip в массив
-          const chipToAdd = chips.find((el) => el.id === chipId);
-          if (chipToAdd) updatedChipsArr.push(chipToAdd);
-        }
+      if (targetChip.checked) {
+        updatedChipsArr = updatedChipsArr.filter((el) => el.id !== chipId);
+      } else {
+        const chipToAdd = chips.find((el) => el.id === chipId);
+        if (chipToAdd) updatedChipsArr.push(chipToAdd);
       }
-    });
-  
-    // Преобразуем массив в массив ID
-    const finalChipsIds = updatedChipsArr.map((el) => el.id);
-  
-    // Формируем объект для обновления
-    const chipsObj = { id: cardId, chips: finalChipsIds };
-  
-    // Локально обновляем кэш
-    dispatch(
-      cardsApi.util.updateQueryData("getCards", undefined, (draft) => {
-        const card = draft.find((c) => c.id === cardId);
-        if (card) {
-          card.chips = finalChipsIds; // Обновляем только поле chips
-        }
-      })
-    );
-  
-    // Отправляем данные на сервер
-    try {
-      await updateCard(chipsObj);
-    } catch (error) {
-      console.error("Ошибка обновления карты:", error);
-  
-      // Если запрос завершился ошибкой, можно откатить изменения в кэше
-      dispatch(
-        cardsApi.util.updateQueryData("getCards", undefined, (draft) => {
-          const card = draft.find((c) => c.id === cardId);
-          if (card) {
-            card.chips = chipsArr.map((el) => el.id); // Восстанавливаем изначальный массив
+
+      const finalChipsIds = updatedChipsArr.map((el) => el.id);
+
+      console.log("Updating card chips:", { cardId, finalChipsIds });
+
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/card/${cardId}/`,
+          {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ chips: finalChipsIds }),
           }
-        })
-      );
-    }
-  };
-  
+        );
+
+        if (response.ok) {
+          const updatedCard = await response.json();
+          console.log("Card updated successfully:", updatedCard);
+
+          // Уведомляем о успешном обновлении
+          if (onChipsUpdate) {
+            setTimeout(onChipsUpdate, 300);
+          }
+        } else {
+          console.error("Failed to update card:", response.status);
+        }
+      } catch (error) {
+        console.error("Error updating card:", error);
+      }
+    },
+    [chipsArr, chipList, chips, cardId, onChipsUpdate]
+  );
+
+  // Обработчики событий
+  const handleSearchChange = useCallback((e) => {
+    setSearchText(e.currentTarget.value);
+  }, []);
+
+  const handleButtonState1 = useCallback(() => setButtonsState(1), []);
+  const handleButtonState2 = useCallback(() => setButtonsState(2), []);
+  const handleButtonState3 = useCallback(() => setButtonsState(3), []);
+  const handleCreateNewChip = useCallback(() => dispatch(popUpToOpen(3)), [dispatch]);
+  const handleClose = useCallback(() => dispatch(popUpToOpen(0)), [dispatch]);
+
   return (
     <Card
       sx={{
@@ -166,80 +133,53 @@ export default function ChangeChipsPallet({ cardId, chipsArr }) {
       }}
     >
       <CardHeader
-        sx={{
-          padding: "5px",
-          marginBottom: "10px",
-        }}
-        titleTypographyProps={{
-          fontSize: "20px",
-          color: "#172b4d",
-        }}
+        sx={{ padding: "5px", marginBottom: "10px" }}
+        titleTypographyProps={{ fontSize: "20px", color: "#172b4d" }}
         title="Метки"
         action={
           <IconButton
-            onClick={() => dispatch(popUpToOpen(0))}
+            onClick={handleClose}
             aria-label="Change-Chips-Pallet"
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              right: "-86px",
-            }}
+            sx={{ display: "flex", justifyContent: "center", alignItems: "center", right: "-86px" }}
           >
             <CloseOutlinedIcon sx={{ fontSize: "18px" }} />
           </IconButton>
         }
       />
+
       <TextField
         label="Искать метки"
         id="search-chip"
         size="small"
         autoFocus={true}
         value={searchText}
-        onChange={(e) => setSearchText(e.currentTarget.value)}
-        sx={{
-          width: "260px",
-          marginBottom: "10px",
-        }}
+        onChange={handleSearchChange}
+        sx={{ width: "260px", marginBottom: "10px" }}
       />
 
-      <CardContent
-        sx={{
-          padding: "0px",
-        }}
-      >
-        <List
-          sx={{
-            height: "430px",
-            overflowY: "auto",
-            overflowX: "hidden",
-          }}
-        >
-          {chipList &&
-            chipList.map((chip) => {
-              const { text, id } = chip;
-              const labelId = `checkbox-list-label-${text}`;
-              return (
-                <ListItem key={id} disablePadding>
-                  <ChipContainer
-                    {...chip}
-                    chipRelateToCardUpdate={chipRelateToCardUpdate}
-                    cardId={cardId}
-                    labelId={labelId}
-                  />
-                </ListItem>
-              );
-            })}
+      <CardContent sx={{ padding: "0px" }}>
+        <List sx={{ height: "430px", overflowY: "auto", overflowX: "hidden" }}>
+          {chipList.map((chip) => {
+            const { name, text, id } = chip;
+            const chipText = name || text;
+            const labelId = `checkbox-list-label-${chipText}`;
+            return (
+              <ListItem key={id} disablePadding>
+                <ChipContainer
+                  {...chip}
+                  chipRelateToCardUpdate={chipRelateToCardUpdate}
+                  cardId={cardId}
+                  labelId={labelId}
+                />
+              </ListItem>
+            );
+          })}
         </List>
       </CardContent>
+
       <CardActions
         disableSpacing
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          width: "100%",
-        }}
+        sx={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}
       >
         <Button
           variant="contained"
@@ -250,14 +190,13 @@ export default function ChangeChipsPallet({ cardId, chipsArr }) {
             marginBottom: "10px",
             backgroundColor: "blue",
             color: "#fff",
-            "&:hover": {
-              backgroundColor: "#e3e3e3",
-            },
+            "&:hover": { backgroundColor: "#e3e3e3" },
           }}
-          onClick={() => dispatch(popUpToOpen(3))}
+          onClick={handleCreateNewChip}
         >
           Создать новую метку
         </Button>
+
         <Button
           variant="contained"
           size="large"
@@ -269,14 +208,13 @@ export default function ChangeChipsPallet({ cardId, chipsArr }) {
             marginBottom: "10px",
             backgroundColor: "#d7d7d7",
             color: "#172b4d",
-            "&:hover": {
-              backgroundColor: "#e3e3e3",
-            },
+            "&:hover": { backgroundColor: "#e3e3e3" },
           }}
-          onClick={() => setButtonsState(1)}
+          onClick={handleButtonState1}
         >
-          {"Показать все"}
+          Показать все
         </Button>
+
         <Button
           variant="contained"
           size="large"
@@ -288,14 +226,13 @@ export default function ChangeChipsPallet({ cardId, chipsArr }) {
             marginBottom: "10px",
             backgroundColor: "#d7d7d7",
             color: "#172b4d",
-            "&:hover": {
-              backgroundColor: "#e3e3e3",
-            },
+            "&:hover": { backgroundColor: "#e3e3e3" },
           }}
-          onClick={() => setButtonsState(2)}
+          onClick={handleButtonState2}
         >
-          {"Показать которых нет на карточке"}
+          Показать которых нет на карточке
         </Button>
+
         <Button
           variant="contained"
           size="large"
@@ -307,13 +244,11 @@ export default function ChangeChipsPallet({ cardId, chipsArr }) {
             marginBottom: "10px",
             backgroundColor: "#d7d7d7",
             color: "#172b4d",
-            "&:hover": {
-              backgroundColor: "#e3e3e3",
-            },
+            "&:hover": { backgroundColor: "#e3e3e3" },
           }}
-          onClick={() => setButtonsState(3)}
+          onClick={handleButtonState3}
         >
-          {"Показать которые есть на карточке"}
+          Показать которые есть на карточке
         </Button>
       </CardActions>
     </Card>

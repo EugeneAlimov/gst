@@ -1,4 +1,4 @@
-import React from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { chipData, popUpToOpen } from "../../../Redux/chip/chip-slice";
 
@@ -15,8 +15,6 @@ import DatesAndTimePallet from "../../DateAndTime/DatesAndTimePallet";
 import CreateNewChip from "../../ChangeChips/CreateNewChip";
 import AllSettingsOfCard from "../AllSettingsOfCard/AllSettingsOfCard";
 
-import { useGetOneCardQuery } from "../../../Redux/cards/cards-operations";
-
 const buttonStyle = {
   height: "32px",
   fontSize: "14px",
@@ -30,36 +28,126 @@ const buttonStyle = {
 };
 
 export default function EditButtonsGroup({ cardId, chipsArr }) {
-  const { data } = useGetOneCardQuery(cardId);
   const dispatch = useDispatch();
-
   const popUpTypeFromState = useSelector(chipData);
   const popUpType = popUpTypeFromState.popUpType;
 
-  function Pop(type) {
-    let pop = null;
+  // Состояния для принудительного обновления
+  const [cardData, setCardData] = useState(null);
+  const [allChips, setAllChips] = useState(chipsArr || []);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    switch (type) {
-      case 10:
-        pop = <AllSettingsOfCard chipsArr={chipsArr} cardId={cardId} {...data} />;
-        break;
-      case 1:
-        pop = <ChangeChipsPallet cardId={cardId} chipsArr={chipsArr} />;
-        break;
-      case 2:
-        pop = <ChangeUsers cardId={cardId} />;
-        break;
-      case 3:
-        pop = <CreateNewChip id={cardId} />;
-        break;
-      case 4:
-        pop = <DatesAndTimePallet cardId={cardId} />;
-        break;
-
-      default:
-        break;
+  // Функция для загрузки данных карточки
+  const fetchCardData = useCallback(async () => {
+    console.log("Fetching card data for card:", cardId);
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/card/${cardId}/`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Fetched card data:", data);
+        setCardData(data);
+      } else {
+        console.error("Failed to fetch card data:", response.status);
+      }
+    } catch (error) {
+      console.error("Error fetching card data:", error);
+    } finally {
+      setIsLoading(false);
     }
-    return <Box sx={{ marginLeft: "10px" }}>{pop}</Box>;
+  }, [cardId]);
+
+  // Функция для загрузки всех чипов
+  const fetchAllChips = useCallback(async () => {
+    console.log("Fetching all chips data");
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/chip/`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const chips = await response.json();
+        console.log("Fetched all chips:", chips.length);
+        setAllChips(chips);
+      } else {
+        console.error("Failed to fetch chips:", response.status);
+      }
+    } catch (error) {
+      console.error("Error fetching chips:", error);
+    }
+  }, []);
+
+  // Обновляем изначальные чипы при изменении chipsArr
+  useEffect(() => {
+    setAllChips(chipsArr || []);
+  }, [chipsArr]);
+
+  // Загружаем данные при монтировании и при изменении refreshTrigger
+  useEffect(() => {
+    Promise.all([
+      fetchCardData(),
+      fetchAllChips()
+    ]);
+  }, [fetchCardData, fetchAllChips, refreshTrigger]);
+
+  // Функция для принудительного обновления
+  const forceRefresh = useCallback(() => {
+    console.log("Force refresh triggered - updating both card and chips");
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
+
+  // Обновляем при возврате к главному меню
+  useEffect(() => {
+    if (popUpType === 0) {
+      console.log("Returned to main menu, refreshing data");
+      setTimeout(forceRefresh, 100);
+    }
+  }, [popUpType, forceRefresh]);
+
+  // Функция для рендеринга попапов
+  const renderPopup = () => {
+    switch (popUpType) {
+      case 10:
+        return <AllSettingsOfCard chipsArr={allChips} cardId={cardId} {...cardData} />;
+      case 1:
+        return (
+          <ChangeChipsPallet 
+            cardId={cardId} 
+            chipsArr={allChips} // Используем обновленные чипы
+            onChipsUpdate={forceRefresh}
+          />
+        );
+      case 2:
+        return <ChangeUsers cardId={cardId} />;
+      case 3:
+        return <CreateNewChip id={cardId} onChipCreated={forceRefresh} />;
+      case 4:
+        return <DatesAndTimePallet cardId={cardId} />;
+      default:
+        return null;
+    }
+  };
+
+  if (isLoading && !cardData) {
+    return (
+      <Box sx={{ display: "flex", flexDirection: "row", margin: "10px" }}>
+        <Box sx={{ margin: "10px", padding: "20px" }}>
+          Загрузка...
+        </Box>
+      </Box>
+    );
   }
 
   return (
@@ -72,7 +160,16 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
         margin: "10px",
       }}
     >
-      {!!data && popUpType !== 10 && <TaskCard {...data} allChips={chipsArr} inPopup={true} />}
+      {/* Превью карточки с обновленными чипами */}
+      {cardData && popUpType !== 10 && (
+        <TaskCard 
+          {...cardData} 
+          allChips={allChips} // Передаем обновленные чипы
+          inPopup={true}
+          key={`card-preview-${cardId}-${refreshTrigger}-${allChips.length}`} // Ключ зависит и от чипов
+        />
+      )}
+      
       {popUpType === 0 ? (
         <Box sx={{ margin: "10px" }}>
           <Stack direction="column" justifyContent="center" alignItems="flex-start" spacing={1}>
@@ -108,7 +205,6 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
               color="secondary"
               size="large"
               sx={buttonStyle}
-              // onClick={() => dispatch(popUpToOpen(3))}
             >
               Сменить обложку
             </Button>
@@ -126,7 +222,6 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
               color="secondary"
               size="large"
               sx={buttonStyle}
-              // onClick={HandleAddNewRowToCheckList}
             >
               Переместить
             </Button>
@@ -135,15 +230,16 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
               color="secondary"
               size="large"
               sx={buttonStyle}
-              // onClick={HandleAddNewRowToCheckList}
             >
               Архивировать
             </Button>
           </Stack>
         </Box>
-      ) : null}
-
-      {Pop(popUpType)}
+      ) : (
+        <Box sx={{ marginLeft: "10px" }}>
+          {renderPopup()}
+        </Box>
+      )}
     </Box>
   );
 }

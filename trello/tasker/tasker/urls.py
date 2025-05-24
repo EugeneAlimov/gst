@@ -39,10 +39,7 @@ router.register(r'user', views.UserViewSet, basename='user')
 router.register(r'board', views.BoardsViewSet, basename='board')
 router.register(r'user-boards', views.UserBoardsViewSet, basename='userBoard')
 router.register(r'card-in-column', views.CardInColumnViewSet, basename='cardInColumn')
-# router.register(r'board-membership', views.BoardMembershipViewSet, basename='boardMembership')
 router.register(r'board-memberships', views.BoardMembershipViewSet, basename='board-membership')
-
-# router.register(r'update-active-board', views.UpdateActiveBoardViewSet, basename='updateActiveBoard')
 
 router.register(r'card', views.CardViewSet, basename='card')
 router.register(r'column', views.ColumnViewSet, basename='column')
@@ -60,9 +57,7 @@ urlpatterns = [
                   path('login/', TemplateView.as_view(template_name="index.html")),
                   path('user/', TemplateView.as_view(template_name="index.html")),
                   path('board/', TemplateView.as_view(template_name="index.html")),
-
                   path('api/v1/update-active-board/', UpdateActiveBoardView.as_view(), name='update_active_board'),
-
                   path('user-boards/', TemplateView.as_view(template_name="index.html")),
                   path('board-membership/', TemplateView.as_view(template_name="index.html")),
                   path('card-in-column/', TemplateView.as_view(template_name="index.html")),
@@ -74,20 +69,12 @@ urlpatterns = [
                   path('comment/', TemplateView.as_view(template_name="index.html")),
                   path('checklist-item/', TemplateView.as_view(template_name="index.html")),
                   path('', TemplateView.as_view(template_name="index.html")),
-
-                  # path('settings', TemplateView.as_view(template_name="index.html")),
-                  # path('analytics', TemplateView.as_view(template_name="index.html")),
-                  # path('dashboard', TemplateView.as_view(template_name="index.html")),
-                  # path('tags-to-ws/', WSTagsUpdateView.as_view(), name='tags-to-ws'),
-                  # path('user-dataset-update/<int:pk>/', UserSetUpdateView.as_view(), name="user-dataset-update"),
-                  # path('analytic/chart/', TemplateView.as_view(template_name="index.html")),
                   path('api/v1/auth/', include('djoser.urls')),
                   re_path(r'auth/', include('djoser.urls.authtoken')),
                   path('api/v1/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
                   path('api/v1/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
                   path('api/v1/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
                   path('api/v1/token/blacklist/', TokenBlacklistView.as_view(), name='token_blacklist'),
-                  # path('api/v1/pars-tags-list/', pars_tags_list_view, name='pars-tags-list')
               ] \
               + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT) \
               + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
