@@ -42,10 +42,34 @@ const iconButtonStyle = {
 };
 
 export default function DatesAndTimePallet({ cardId }) {
+  console.log('DatesAndTimePallet received cardId:', cardId);
+  
+  // Проверяем валидность cardId
+  if (!cardId || cardId === 'undefined' || typeof cardId === 'undefined') {
+    console.error('DatesAndTimePallet: Invalid cardId received:', cardId);
+    return (
+      <Card sx={cardStyle}>
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Ошибка: Не указан ID карточки
+        </div>
+      </Card>
+    );
+  }
+
   const [cardTimeUpdate] = useUpdateCardDetailMutation();
 
-  const { data: periodData } = useGetOneCardQuery(cardId);
-  const { date_time_start, date_time_finish, date_time_reminder } = periodData;
+  const { data: periodData, isLoading, error } = useGetOneCardQuery(cardId);
+  
+  console.log('Period data:', periodData);
+  console.log('Loading:', isLoading);
+  console.log('Error:', error);
+
+  // Безопасная деструктуризация с fallback значениями
+  const {
+    date_time_start = null,
+    date_time_finish = null,
+    date_time_reminder = null
+  } = periodData || {};
 
   const [startDayValue, setStartDayValue] = useState(defaultValue);
   const [completitionDayValue, setCompletitiontDayValue] = useState(defaultValue);
@@ -58,6 +82,39 @@ export default function DatesAndTimePallet({ cardId }) {
   const [selectValue, setSelectValue] = useState(-10);
   const [reminder, setReminder] = useState();
 
+  // Показываем загрузку
+  if (isLoading) {
+    return (
+      <Card sx={cardStyle}>
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Загрузка данных карточки...
+        </div>
+      </Card>
+    );
+  }
+
+  // Показываем ошибку
+  if (error) {
+    return (
+      <Card sx={cardStyle}>
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Ошибка загрузки карточки: {error.message || 'Неизвестная ошибка'}
+        </div>
+      </Card>
+    );
+  }
+
+  // Показываем состояние загрузки, если данных еще нет
+  if (!periodData) {
+    return (
+      <Card sx={cardStyle}>
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Нет данных карточки...
+        </div>
+      </Card>
+    );
+  }
+
   // первый рендеринг компонента
   useEffect(() => {
     const compareValue = JSON.stringify(new Date("1970-01-01T00:00:00.000Z"));
@@ -66,16 +123,12 @@ export default function DatesAndTimePallet({ cardId }) {
 
     const startDayDefault =
       startDayDefaultCheck === compareValue
-        ?
-      defaultValue
-        :
-      new Date(date_time_start);
+        ? defaultValue
+        : new Date(date_time_start);
     const completitionDefault =
       completitionDefaultCheck === compareValue
-        ?
-      defaultValue
-        :
-      new Date(date_time_finish);
+        ? defaultValue
+        : new Date(date_time_finish);
     const reminderDefault = new Date(date_time_reminder);
 
     setStartDayValue(startDayDefault);
@@ -111,7 +164,7 @@ export default function DatesAndTimePallet({ cardId }) {
       }
       setSelectValue(difference);
     }
-  }, [periodData]);
+  }, [periodData, date_time_start, date_time_finish, date_time_reminder]);
 
   const dispatch = useDispatch();
 
@@ -227,7 +280,7 @@ export default function DatesAndTimePallet({ cardId }) {
       ? (cardObj.date_time_start = startDayValue)
       : (cardObj.date_time_start = "1970-01-01T00:00:00.000Z");
     try {
-      await cardTimeUpdate({ cardId, cardObj });
+      await cardTimeUpdate({ id: cardId, ...cardObj });
     } catch (error) {
       console.log(error);
     }
@@ -240,7 +293,7 @@ export default function DatesAndTimePallet({ cardId }) {
       date_time_start: "1970-01-01T00:00:00.000Z",
     };
     try {
-      await cardTimeUpdate({ cardId, periodObj });
+      await cardTimeUpdate({ id: cardId, ...periodObj });
     } catch (error) {
       console.log(error);
     }
