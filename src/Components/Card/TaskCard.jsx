@@ -120,14 +120,22 @@ function TaskCard({
   const [cardText, setCardText] = useState(text);
   const [cardTextBuffer, setCardTextBuffer] = useState("");
 
+  const chipsUpdateKey = useMemo(() => {
+    if (!allChips) return "no-chips";
+    return allChips
+      .map((chip) => `${chip.id}-${chip.name}-${chip.color?.id}-${chip.updated || ""}`)
+      .join(",");
+  }, [allChips]);
+
   useEffect(() => {
-    console.log(`Card ${id}: Updating chips array`, {
+    console.log(`Card ${id}: Updating chips array with key change`, {
       oldCount: chipsArr.length,
       newCount: processedChips.length,
       inPopup,
+      updateKey: chipsUpdateKey.substring(0, 100) + "...", // обрезаем для читаемости
     });
     setChipsArr(processedChips);
-  }, [processedChips, id, inPopup]);
+  }, [processedChips, id, inPopup, chipsUpdateKey]);
 
   useEffect(() => {
     setTimeout(() => {

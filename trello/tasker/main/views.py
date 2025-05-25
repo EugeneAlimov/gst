@@ -588,6 +588,8 @@ class ChipViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
 
+        print(f"Updating chip {instance.id}, old updated: {instance.updated}")
+
         # Подготавливаем данные для сериализатора
         data = {}
 
@@ -605,9 +607,9 @@ class ChipViewSet(viewsets.ModelViewSet):
 
         if serializer.is_valid():
             chip = serializer.save()
+
             return Response(serializer.data)
         else:
-            print("Update validation errors:", serializer.errors)  # Для отладки
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

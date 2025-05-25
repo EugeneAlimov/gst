@@ -132,7 +132,8 @@ class ChipSerializer(serializers.ModelSerializer):
         if 'name' in validated_data:
             instance.name = validated_data['name']
 
-        instance.save()
+        instance.save()  # Это должно обновить поле updated
+        instance.refresh_from_db()  # Принудительно обновляем данные из БД
         return instance
 
     def to_representation(self, instance):

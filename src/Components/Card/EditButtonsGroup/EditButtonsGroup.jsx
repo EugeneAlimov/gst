@@ -14,6 +14,7 @@ import ChangeUsers from "../ChangeUsers/ChangeUsers";
 import DatesAndTimePallet from "../../DateAndTime/DatesAndTimePallet";
 import CreateNewChip from "../../ChangeChips/CreateNewChip";
 import AllSettingsOfCard from "../AllSettingsOfCard/AllSettingsOfCard";
+import { cardsApi } from "../../../Redux/cards/cards-operations";
 
 const buttonStyle = {
   height: "32px",
@@ -42,15 +43,18 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
   const fetchCardData = useCallback(async () => {
     console.log("Fetching card data for card:", cardId);
     setIsLoading(true);
-    
+
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/card/${cardId}/`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/card/${cardId}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
       if (response.ok) {
         const data = await response.json();
         console.log("Fetched card data:", data);
@@ -68,15 +72,18 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
   // Функция для загрузки всех чипов
   const fetchAllChips = useCallback(async () => {
     console.log("Fetching all chips data");
-    
+
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/chip/`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/chip/`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
       if (response.ok) {
         const chips = await response.json();
         console.log("Fetched all chips:", chips.length);
@@ -96,25 +103,35 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
 
   // Загружаем данные при монтировании и при изменении refreshTrigger
   useEffect(() => {
-    Promise.all([
-      fetchCardData(),
-      fetchAllChips()
-    ]);
+    Promise.all([fetchCardData(), fetchAllChips()]);
   }, [fetchCardData, fetchAllChips, refreshTrigger]);
 
   // Функция для принудительного обновления
   const forceRefresh = useCallback(() => {
     console.log("Force refresh triggered - updating both card and chips");
-    setRefreshTrigger(prev => prev + 1);
+    setRefreshTrigger((prev) => prev + 1);
   }, []);
 
   // Обновляем при возврате к главному меню
   useEffect(() => {
     if (popUpType === 0) {
       console.log("Returned to main menu, refreshing data");
-      setTimeout(forceRefresh, 100);
+      // Добавляем небольшую задержку для гарантии обновления
+      setTimeout(() => {
+        forceRefresh();
+        // Дополнительно инвалидируем кэш карточек
+        dispatch(cardsApi.util.invalidateTags([{ type: "cards", id: cardId }]));
+      }, 100);
     }
-  }, [popUpType, forceRefresh]);
+  }, [popUpType, forceRefresh, dispatch, cardId]);
+
+  useEffect(() => {
+    console.log("AllChips updated:", {
+      count: allChips?.length,
+      updateKey: allChips?.map((c) => `${c.id}:${c.updated}`).join(","),
+      fullChips: allChips, // Добавляем полные данные для отладки
+    });
+  }, [allChips]);
 
   // Функция для рендеринга попапов
   const renderPopup = () => {
@@ -123,8 +140,8 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
         return <AllSettingsOfCard chipsArr={allChips} cardId={cardId} {...cardData} />;
       case 1:
         return (
-          <ChangeChipsPallet 
-            cardId={cardId} 
+          <ChangeChipsPallet
+            cardId={cardId}
             chipsArr={allChips} // Используем обновленные чипы
             onChipsUpdate={forceRefresh}
           />
@@ -143,9 +160,7 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
   if (isLoading && !cardData) {
     return (
       <Box sx={{ display: "flex", flexDirection: "row", margin: "10px" }}>
-        <Box sx={{ margin: "10px", padding: "20px" }}>
-          Загрузка...
-        </Box>
+        <Box sx={{ margin: "10px", padding: "20px" }}>Загрузка...</Box>
       </Box>
     );
   }
@@ -162,14 +177,14 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
     >
       {/* Превью карточки с обновленными чипами */}
       {cardData && popUpType !== 10 && (
-        <TaskCard 
-          {...cardData} 
+        <TaskCard
+          {...cardData}
           allChips={allChips} // Передаем обновленные чипы
           inPopup={true}
           key={`card-preview-${cardId}-${refreshTrigger}-${allChips.length}`} // Ключ зависит и от чипов
         />
       )}
-      
+
       {popUpType === 0 ? (
         <Box sx={{ margin: "10px" }}>
           <Stack direction="column" justifyContent="center" alignItems="flex-start" spacing={1}>
@@ -200,12 +215,7 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
             >
               Изменить участников
             </Button>
-            <Button
-              variant="contained"
-              color="secondary"
-              size="large"
-              sx={buttonStyle}
-            >
+            <Button variant="contained" color="secondary" size="large" sx={buttonStyle}>
               Сменить обложку
             </Button>
             <Button
@@ -217,28 +227,16 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
             >
               Изменить даты
             </Button>
-            <Button
-              variant="contained"
-              color="secondary"
-              size="large"
-              sx={buttonStyle}
-            >
+            <Button variant="contained" color="secondary" size="large" sx={buttonStyle}>
               Переместить
             </Button>
-            <Button
-              variant="contained"
-              color="secondary"
-              size="large"
-              sx={buttonStyle}
-            >
+            <Button variant="contained" color="secondary" size="large" sx={buttonStyle}>
               Архивировать
             </Button>
           </Stack>
         </Box>
       ) : (
-        <Box sx={{ marginLeft: "10px" }}>
-          {renderPopup()}
-        </Box>
+        <Box sx={{ marginLeft: "10px" }}>{renderPopup()}</Box>
       )}
     </Box>
   );

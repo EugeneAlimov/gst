@@ -27,6 +27,7 @@ import CardChip from "../Card/CardChipsSection/CardChip";
 
 //import API hooks
 import {
+  chipsApi,
   useCreateNewChipMutation,
   useDeleteChipMutation,
   useUpdateChipMutation,
@@ -35,6 +36,7 @@ import { useGetColorPaletteQuery } from "../../Redux/chip/chip-operations";
 
 //import styles
 import { chipStyleCreateNewChip, chipStyleChipContainer } from "../../constants/chipContainerStyle";
+import { cardsApi } from "../../Redux/cards/cards-operations";
 
 export default function CreateNewChip({ id, onChipCreated }) {
   const [chipUpdate] = useUpdateChipMutation();
@@ -132,11 +134,27 @@ export default function CreateNewChip({ id, onChipCreated }) {
         await createNewChip(chipData).unwrap();
         console.log("Chip created successfully");
       } else {
-        await chipUpdate({
+        const updatedChip = await chipUpdate({
           chipId: targetChipId,
           updateChipObj: updateChipData,
         }).unwrap();
-        console.log("Chip updated successfully");
+
+        console.log("Chip updated successfully", updatedChip);
+
+        // РАБОЧЕЕ РЕШЕНИЕ - полная очистка кэша
+        setTimeout(() => {
+          console.log("Clearing all RTK Query cache...");
+          dispatch(chipsApi.util.resetApiState());
+
+          setTimeout(() => {
+            console.log("Reloading chips data...");
+            dispatch(
+              chipsApi.endpoints.getAllChips.initiate(undefined, {
+                forceRefetch: true,
+              })
+            );
+          }, 50);
+        }, 20);
       }
 
       // Сброс формы и возврат к списку
@@ -145,7 +163,7 @@ export default function CreateNewChip({ id, onChipCreated }) {
 
       // Уведомляем о завершении операции
       if (onChipCreated) {
-        setTimeout(onChipCreated, 200);
+        setTimeout(onChipCreated, 500);
       }
     } catch (error) {
       console.error("Ошибка при сохранении чипа:", error);
