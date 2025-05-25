@@ -44,33 +44,11 @@ const iconButtonStyle = {
 export default function DatesAndTimePallet({ cardId }) {
   console.log('DatesAndTimePallet received cardId:', cardId);
   
-  // Проверяем валидность cardId
-  if (!cardId || cardId === 'undefined' || typeof cardId === 'undefined') {
-    console.error('DatesAndTimePallet: Invalid cardId received:', cardId);
-    return (
-      <Card sx={cardStyle}>
-        <div style={{ padding: "20px", textAlign: "center" }}>
-          Ошибка: Не указан ID карточки
-        </div>
-      </Card>
-    );
-  }
-
+  const dispatch = useDispatch();
   const [cardTimeUpdate] = useUpdateCardDetailMutation();
-
-  const { data: periodData, isLoading, error } = useGetOneCardQuery(cardId);
   
-  console.log('Period data:', periodData);
-  console.log('Loading:', isLoading);
-  console.log('Error:', error);
-
-  // Безопасная деструктуризация с fallback значениями
-  const {
-    date_time_start = null,
-    date_time_finish = null,
-    date_time_reminder = null
-  } = periodData || {};
-
+  // ВСЕ хуки всегда вызываются, независимо от условий
+  const { data: periodData, isLoading, error } = useGetOneCardQuery(cardId);
   const [startDayValue, setStartDayValue] = useState(defaultValue);
   const [completitionDayValue, setCompletitiontDayValue] = useState(defaultValue);
   const [completitionTimeValue, setCompletitiontTimeValue] = useState(defaultValue);
@@ -78,45 +56,26 @@ export default function DatesAndTimePallet({ cardId }) {
   const [completitionDayChecked, setCompletitionDayChecked] = useState(false);
   const [calendarValue, setCalendarValue] = useState();
   const [bufferCalendarValue, setBufferCalendarValue] = useState([defaultValue, defaultValue]);
-
   const [selectValue, setSelectValue] = useState(-10);
   const [reminder, setReminder] = useState();
 
-  // Показываем загрузку
-  if (isLoading) {
-    return (
-      <Card sx={cardStyle}>
-        <div style={{ padding: "20px", textAlign: "center" }}>
-          Загрузка данных карточки...
-        </div>
-      </Card>
-    );
-  }
+  console.log('Period data:', periodData);
+  console.log('Loading:', isLoading);
+  console.log('Error:', error);
 
-  // Показываем ошибку
-  if (error) {
-    return (
-      <Card sx={cardStyle}>
-        <div style={{ padding: "20px", textAlign: "center" }}>
-          Ошибка загрузки карточки: {error.message || 'Неизвестная ошибка'}
-        </div>
-      </Card>
-    );
-  }
+  // Определяем что показывать
+  const isInvalidCardId = !cardId || cardId === 'undefined' || typeof cardId === 'undefined';
+  const hasData = periodData && !isLoading && !error && !isInvalidCardId;
 
-  // Показываем состояние загрузки, если данных еще нет
-  if (!periodData) {
-    return (
-      <Card sx={cardStyle}>
-        <div style={{ padding: "20px", textAlign: "center" }}>
-          Нет данных карточки...
-        </div>
-      </Card>
-    );
-  }
+  // Безопасная деструктуризация
+  const date_time_start = hasData ? periodData.date_time_start : null;
+  const date_time_finish = hasData ? periodData.date_time_finish : null;
+  const date_time_reminder = hasData ? periodData.date_time_reminder : null;
 
-  // первый рендеринг компонента
+  // первый рендеринг компонента - только если есть данные
   useEffect(() => {
+    if (!hasData) return;
+    
     const compareValue = JSON.stringify(new Date("1970-01-01T00:00:00.000Z"));
     const startDayDefaultCheck = JSON.stringify(new Date(date_time_start));
     const completitionDefaultCheck = JSON.stringify(new Date(date_time_finish));
@@ -164,13 +123,11 @@ export default function DatesAndTimePallet({ cardId }) {
       }
       setSelectValue(difference);
     }
-  }, [periodData, date_time_start, date_time_finish, date_time_reminder]);
-
-  const dispatch = useDispatch();
+  }, [hasData, date_time_start, date_time_finish, date_time_reminder]);
 
   // обновлене календаря (когда меняются статусы checkbox старт и конец - значения берутся из буфера)
   useEffect(() => {
-    if (bufferCalendarValue === undefined) return;
+    if (!hasData || bufferCalendarValue === undefined) return;
     const start = bufferCalendarValue[0];
     const end = bufferCalendarValue[1];
 
@@ -187,7 +144,7 @@ export default function DatesAndTimePallet({ cardId }) {
     if (endOnly) {
       setCalendarValue(end);
     }
-  }, [bufferCalendarValue, completitionDayChecked, startDayChecked]);
+  }, [hasData, bufferCalendarValue, completitionDayChecked, startDayChecked]);
 
   // обновление буфера календаря (когда меняются значения в полях даты и времени старт и конец)
   const getDayHandler = (calendarValue) => {
@@ -312,51 +269,92 @@ export default function DatesAndTimePallet({ cardId }) {
     [completitionDayValue, completitionTimeValue]
   );
 
+  // Условный рендеринг в JSX
+  const renderContent = () => {
+    if (isInvalidCardId) {
+      return (
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Ошибка: Не указан ID карточки
+        </div>
+      );
+    }
+
+    if (isLoading) {
+      return (
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Загрузка данных карточки...
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Ошибка загрузки карточки: {error.message || 'Неизвестная ошибка'}
+        </div>
+      );
+    }
+
+    if (!periodData) {
+      return (
+        <div style={{ padding: "20px", textAlign: "center" }}>
+          Нет данных карточки...
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <CardHeader
+          sx={{
+            padding: "10px",
+            marginBottom: "10px",
+          }}
+          titleTypographyProps={{ textAlign: "center", fontSize: "20px", color: "#172b4d" }}
+          title="Даты и время"
+          action={
+            <IconButton
+              onClick={() => dispatch(popUpToOpen(0))}
+              aria-label="Change-Chips-Pallet"
+              sx={iconButtonStyle}
+            >
+              <CloseOutlinedIcon sx={{ fontSize: "18px" }} />
+            </IconButton>
+          }
+        />
+        <Dates
+          getDayHandler={getDayHandler}
+          calendarValue={calendarValue}
+          startDayChecked={startDayChecked}
+          completitionDayChecked={completitionDayChecked}
+        />
+        <Period
+          startDayValue={startDayValue}
+          completitionDayValue={completitionDayValue}
+          completitionTimeValue={completitionTimeValue}
+          getStartDayHandler={getStartDayHandler}
+          getCompletitionDayHandler={getCompletitionDayHandler}
+          getCompletitionTimeHandler={getCompletitionTimeHandler}
+          getstartDayCheckedHandler={getstartDayCheckedHandler}
+          getcompletitionDayCheckedHandler={getcompletitionDayCheckedHandler}
+          startDayChecked={startDayChecked}
+          completitionDayChecked={completitionDayChecked}
+          defaultValue={defaultValue}
+        />
+        <Remainder defaultValue={selectValue} remaindeBefore={remaindeBefore} />
+        <DateAndTimeButtonsGroup
+          startDayChecked={startDayChecked}
+          completitionDayChecked={completitionDayChecked}
+          saveChanges={saveChanges}
+          remove={remove}
+        />
+      </>
+    );
+  };
+
   return (
     <Card sx={cardStyle}>
-      <CardHeader
-        sx={{
-          padding: "10px",
-          marginBottom: "10px",
-        }}
-        titleTypographyProps={{ textAlign: "center", fontSize: "20px", color: "#172b4d" }}
-        title="Даты и время"
-        action={
-          <IconButton
-            onClick={() => dispatch(popUpToOpen(0))}
-            aria-label="Change-Chips-Pallet"
-            sx={iconButtonStyle}
-          >
-            <CloseOutlinedIcon sx={{ fontSize: "18px" }} />
-          </IconButton>
-        }
-      />
-      <Dates
-        getDayHandler={getDayHandler}
-        calendarValue={calendarValue}
-        startDayChecked={startDayChecked}
-        completitionDayChecked={completitionDayChecked}
-      />
-      <Period
-        startDayValue={startDayValue}
-        completitionDayValue={completitionDayValue}
-        completitionTimeValue={completitionTimeValue}
-        getStartDayHandler={getStartDayHandler}
-        getCompletitionDayHandler={getCompletitionDayHandler}
-        getCompletitionTimeHandler={getCompletitionTimeHandler}
-        getstartDayCheckedHandler={getstartDayCheckedHandler}
-        getcompletitionDayCheckedHandler={getcompletitionDayCheckedHandler}
-        startDayChecked={startDayChecked}
-        completitionDayChecked={completitionDayChecked}
-        defaultValue={defaultValue}
-      />
-      <Remainder defaultValue={selectValue} remaindeBefore={remaindeBefore} />
-      <DateAndTimeButtonsGroup
-        startDayChecked={startDayChecked}
-        completitionDayChecked={completitionDayChecked}
-        saveChanges={saveChanges}
-        remove={remove}
-      />
+      {renderContent()}
     </Card>
   );
 }
