@@ -17,7 +17,6 @@ import { popUpToOpen, chipData } from "../../../Redux/chip/chip-slice";
 
 //import styles
 import * as Style from "./styleConst";
-import { chipColor } from "../../../constants/colorsConst";
 import { chipStyleCreateNewChip } from "../../../constants/chipContainerStyle";
 
 export default function Cheeps({ chipsArr, cardChips, cardId }) {
@@ -27,30 +26,24 @@ export default function Cheeps({ chipsArr, cardChips, cardId }) {
   // Фильтруем только метки, привязанные к карточке
   const cardChipsData = useMemo(() => {
     if (!chipsArr || !cardChips) {
-      console.log('No chips data available for card chips filtering');
+      console.log("No chips data available for card chips filtering");
       return [];
     }
 
-    console.log('Filtering card chips:', {
+    console.log("Filtering card chips:", {
       allChipsCount: chipsArr.length,
       cardChipsIds: cardChips,
-      sampleAllChip: chipsArr[0]
+      sampleAllChip: chipsArr[0],
     });
 
     // Находим только те чипы, которые привязаны к карточке
-    const result = chipsArr.filter(chip => cardChips.includes(chip.id));
-    
-    console.log(`Card has ${result.length} chips from ${cardChips.length} chip IDs`);
+    const result = chipsArr.filter((chip) => cardChips.includes(chip.id));
+
     return result;
   }, [chipsArr, cardChips]);
 
   // Обработчик клика по кнопке добавления метки
   const handleAddChip = () => {
-    console.log('Add chip button clicked from AllSettingsOfCard!');
-    console.log('Current popUpType:', popUpType);
-    console.log('Card chips:', cardChipsData);
-    console.log('cardId:', cardId);
-    
     // Открываем окно управления метками
     dispatch(popUpToOpen(1)); // 1 = ChangeChipsPallet
   };
@@ -64,7 +57,7 @@ export default function Cheeps({ chipsArr, cardChips, cardId }) {
           return (
             <CardChip
               key={chip.id}
-              color={chipColor[chip.color_number] || chip.color}
+              color={chip.color} // Убираем fallback на chipColor - теперь только данные из БД
               labelId={labelId}
               chipStyle={chipStyleCreateNewChip}
               chipText={chip.text || chip.name}
@@ -72,8 +65,8 @@ export default function Cheeps({ chipsArr, cardChips, cardId }) {
             />
           );
         })}
-        <IconButton 
-          size="small" 
+        <IconButton
+          size="small"
           sx={Style.addIconButton}
           onClick={handleAddChip}
           aria-label="Добавить метку"

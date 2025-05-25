@@ -3,7 +3,6 @@ import Box from "@mui/material/Box";
 
 import CardChip from "./CardChip";
 
-import { chipColor } from "../../../constants/colorsConst";
 import {
   boxStyleardChipContainer,
   chipStyleCardChipContainer,
@@ -16,16 +15,16 @@ export default function CardChipContainer({ chips }) {
       {
       chips &&
       chips.map((value) => {
-        const {color_number, text, id} = value
+        const {color_number, text, id, color, name} = value
 
         const labelId = `checkbox-list-label-${value}`;
 
         return (
           <CardChip
             key={id}
-            color={chipColor[color_number]}
+            color={color} // Теперь используем объект color из БД вместо chipColor[color_number]
             labelId={labelId}
-            chipText={text}
+            chipText={text || name} // Поддерживаем и text и name
             chipStyle={chipStyleCardChipContainer}
           />
         );

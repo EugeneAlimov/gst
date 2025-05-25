@@ -6,7 +6,13 @@ import Tooltip from "@mui/material/Tooltip";
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import { format, isValid } from "date-fns";
-import { chipColor } from "../../../constants/colorsConst";
+
+// Константы цветов для статусов задач (независимо от цветовой палитры меток)
+const STATUS_COLORS = {
+  0: "#baf3db", // нормальный статус - светло-зеленый
+  1: "#f5cd47", // в работе - желтый
+  3: "#ffd5d2", // просрочено - светло-красный
+};
 
 export default function TaskTerminIcon({
   boxStyle,
@@ -43,31 +49,21 @@ export default function TaskTerminIcon({
     return null;
   }
 
-  const color = (value) => {
-    let tempColor = 0;
-    switch (value) {
-      case 1:
-        tempColor = 6;
-        break;
-      case 3:
-        tempColor = 9;
-        break;
-      default:
-        tempColor = 0;
-        break;
-    }
-    return tempColor;
+  // Функция для получения цвета по статусу
+  const getStatusColor = (statusValue) => {
+    return STATUS_COLORS[statusValue] || STATUS_COLORS[0];
   };
 
   const extBoxStyle = {
     ...boxStyle,
     paddingRight: "6px",
     borderRadius: "6px",
-    backgroundColor: chipColor[color(status)]?.normal || "#ffd5d2",
+    backgroundColor: getStatusColor(status),
     "&:hover": {
       backgroundColor: "#e7c8c6",
     },
   };
+  
   const extIconStyle = { ...iconStyle, color: "#953827" };
   const extTypographyStyle = { ...typographyStyle, color: "#953827" };
 
