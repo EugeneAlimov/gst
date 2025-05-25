@@ -7,17 +7,20 @@ export default function DateAndTimeButtonsGroup({
   completitionDayChecked,
   saveChanges,
   remove,
-  disabled = false, // ✅ Новый проп для валидации
+  disabled = false,
 }) {
-  const disabledBtns = !startDayChecked && !completitionDayChecked;
-  const saveDisabled = disabledBtns || disabled;
+  // Логика определения состояния кнопок
+  const noDateSelected = !startDayChecked && !completitionDayChecked;
+  const saveDisabled = noDateSelected || disabled;
+  const removeDisabled = noDateSelected;
 
-  const SaveButton = ({ children, ...props }) => {
-    if (disabled) {
+  // Компонент кнопки с тултипом для отключенного состояния
+  const ButtonWithTooltip = ({ children, disabled, tooltipText, ...props }) => {
+    if (disabled && tooltipText) {
       return (
-        <Tooltip title="Исправьте ошибки валидации перед сохранением">
-          <span>
-            <Button {...props} disabled>
+        <Tooltip title={tooltipText} placement="top">
+          <span style={{ width: "100%" }}>
+            <Button {...props} disabled fullWidth>
               {children}
             </Button>
           </span>
@@ -25,7 +28,29 @@ export default function DateAndTimeButtonsGroup({
       );
     }
 
-    return <Button {...props}>{children}</Button>;
+    return (
+      <Button {...props} disabled={disabled} fullWidth>
+        {children}
+      </Button>
+    );
+  };
+
+  // Определяем тексты для тултипов
+  const getSaveTooltip = () => {
+    if (noDateSelected) {
+      return "Выберите хотя бы одну дату для сохранения";
+    }
+    if (disabled) {
+      return "Исправьте ошибки валидации перед сохранением";
+    }
+    return "";
+  };
+
+  const getRemoveTooltip = () => {
+    if (noDateSelected) {
+      return "Нет дат для удаления";
+    }
+    return "";
   };
 
   return (
@@ -35,47 +60,82 @@ export default function DateAndTimeButtonsGroup({
         flexDirection: "column",
         alignItems: "center",
         width: "100%",
+        gap: 1,
       }}
     >
-      <SaveButton
+      {/* Кнопка сохранения */}
+      <ButtonWithTooltip
         variant="contained"
         color="primary"
         sx={{
-          width: "100%",
-          height: "32px",
+          height: "40px",
           fontSize: "14px",
-          marginBottom: "10px",
+          fontWeight: "500",
         }}
         disabled={saveDisabled}
         onClick={saveChanges}
+        tooltipText={getSaveTooltip()}
       >
-        Сохранить
-      </SaveButton>
+        Сохранить изменения
+      </ButtonWithTooltip>
 
-      <Button
-        variant="contained"
-        color="secondary"
-        size="large"
+      {/* Кнопка удаления */}
+      <ButtonWithTooltip
+        variant="outlined"
+        color="error"
         sx={{
-          width: "100%",
-          height: "32px",
+          height: "36px",
           fontSize: "14px",
-          marginBottom: "10px",
-          backgroundColor: "#d7d7d7",
-          color: "black",
+          backgroundColor: "transparent",
           "&:hover": {
-            backgroundColor: "#e3e3e3",
+            backgroundColor: "rgba(211, 47, 47, 0.04)",
           },
           "&:disabled": {
-            backgroundColor: "#f5f5f5",
-            color: "#999",
+            backgroundColor: "transparent",
+            borderColor: "rgba(0, 0, 0, 0.12)",
+            color: "rgba(0, 0, 0, 0.26)",
           },
         }}
-        disabled={disabledBtns}
+        disabled={removeDisabled}
         onClick={remove}
+        tooltipText={getRemoveTooltip()}
       >
-        Удалить
-      </Button>
+        Удалить даты
+      </ButtonWithTooltip>
+
+      {/* Информационный блок */}
+      <Box
+        sx={{
+          marginTop: "8px",
+          padding: "8px",
+          backgroundColor: "#f5f5f5",
+          borderRadius: "4px",
+          width: "100%",
+          textAlign: "center",
+        }}
+      >
+        <Box sx={{ fontSize: "12px", color: "#666", lineHeight: 1.4 }}>
+          {noDateSelected && <span>📅 Выберите дату начала и/или завершения</span>}
+
+          {startDayChecked && !completitionDayChecked && (
+            <span>📅 Установлена только дата начала</span>
+          )}
+
+          {!startDayChecked && completitionDayChecked && (
+            <span>📅 Установлена только дата завершения</span>
+          )}
+
+          {startDayChecked && completitionDayChecked && (
+            <span>📅 Установлен период от начала до завершения</span>
+          )}
+        </Box>
+
+        {disabled && (
+          <Box sx={{ fontSize: "11px", color: "#d32f2f", marginTop: "4px" }}>
+            ⚠️ Исправьте ошибки валидации
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }

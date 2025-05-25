@@ -2,18 +2,20 @@ import { useEffect, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { chipData, popUpToOpen } from "../../../Redux/chip/chip-slice";
 
-//import MIU components
+// MUI components
 import Stack from "@mui/material/Stack";
 import Button from "@mui/material/Button";
-import TaskCard from "../TaskCard";
 import Box from "@mui/material/Box";
 
-//import components
+// Components
+import TaskCard from "../TaskCard";
 import ChangeChipsPallet from "../../ChangeChips/ChangeChipsPallet";
 import ChangeUsers from "../ChangeUsers/ChangeUsers";
 import DatesAndTimePallet from "../../DateAndTime/DatesAndTimePallet";
 import CreateNewChip from "../../ChangeChips/CreateNewChip";
 import AllSettingsOfCard from "../AllSettingsOfCard/AllSettingsOfCard";
+
+// Redux
 import { cardsApi } from "../../../Redux/cards/cards-operations";
 
 const buttonStyle = {
@@ -28,43 +30,46 @@ const buttonStyle = {
   },
 };
 
-// ✅ ИСПРАВЛЕНИЕ: Переименовываем параметр для избежания конфликта имен
-export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...cardData }) {
+export default function EditButtonsGroup({ cardId, chipsArr, ...cardData }) {
   const dispatch = useDispatch();
   const popUpTypeFromState = useSelector(chipData);
   const popUpType = popUpTypeFromState.popUpType;
 
-  // ✅ ИСПРАВЛЕНИЕ: Сохраняем оригинальный cardId в состоянии
-  const [currentCardId] = useState(originalCardId);
+  // Улучшенная валидация cardId
+  const isValidCardId = useCallback(() => {
+    return (
+      cardId &&
+      cardId !== "undefined" &&
+      cardId !== null &&
+      cardId !== undefined &&
+      (typeof cardId === "number" || (typeof cardId === "string" && cardId !== ""))
+    );
+  }, [cardId]);
 
-  // ✅ Валидация cardId
-  const isValidCardId =
-    currentCardId &&
-    currentCardId !== "undefined" &&
-    typeof currentCardId !== "undefined" &&
-    currentCardId !== null;
-
-  console.log("EditButtonsGroup received cardId:", currentCardId, "isValid:", isValidCardId);
+  console.log("EditButtonsGroup mounted with cardId:", cardId, "isValid:", isValidCardId());
 
   // Состояния для принудительного обновления
   const [cardDataState, setCardDataState] = useState(null);
   const [allChips, setAllChips] = useState(chipsArr || []);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [error, setError] = useState(null);
 
   // Функция для загрузки данных карточки
   const fetchCardData = useCallback(async () => {
-    if (!isValidCardId) {
+    if (!isValidCardId()) {
       console.error("EditButtonsGroup: Invalid cardId, skipping fetch");
       setIsLoading(false);
+      setError("Невалидный ID карточки");
       return;
     }
 
     setIsLoading(true);
+    setError(null);
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/api/v1/card/${currentCardId}/`,
+        `${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/api/v1/card/${cardId}/`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
@@ -77,14 +82,17 @@ export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...
         const data = await response.json();
         setCardDataState(data);
       } else {
-        console.error("Failed to fetch card data:", response.status);
+        const errorText = await response.text();
+        console.error("Failed to fetch card data:", response.status, errorText);
+        setError(`Ошибка загрузки: ${response.status}`);
       }
     } catch (error) {
       console.error("Network error fetching card data:", error);
+      setError("Ошибка сети при загрузке карточки");
     } finally {
       setIsLoading(false);
     }
-  }, [currentCardId, isValidCardId]);
+  }, [cardId, isValidCardId]);
 
   // Функция для загрузки всех чипов
   const fetchAllChips = useCallback(async () => {
@@ -103,7 +111,7 @@ export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...
         const chips = await response.json();
         setAllChips(chips);
       } else {
-        console.error("Failed to fetch chips");
+        console.error("Failed to fetch chips:", response.status);
       }
     } catch (error) {
       console.error("Network error fetching chips:", error);
@@ -112,15 +120,20 @@ export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...
 
   // Обновляем изначальные чипы при изменении chipsArr
   useEffect(() => {
-    setAllChips(chipsArr || []);
+    if (chipsArr) {
+      setAllChips(chipsArr);
+    }
   }, [chipsArr]);
 
   // Загружаем данные при монтировании и при изменении refreshTrigger
   useEffect(() => {
-    if (isValidCardId) {
+    if (isValidCardId()) {
       Promise.all([fetchCardData(), fetchAllChips()]);
+    } else {
+      setIsLoading(false);
+      setError("Невалидный ID карточки");
     }
-  }, [fetchCardData, fetchAllChips, refreshTrigger, isValidCardId]);
+  }, [fetchCardData, fetchAllChips, refreshTrigger]);
 
   // Функция для принудительного обновления
   const forceRefresh = useCallback(() => {
@@ -129,17 +142,17 @@ export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...
 
   // Обновляем при возврате к главному меню
   useEffect(() => {
-    if (popUpType === 0 && isValidCardId) {
+    if (popUpType === 0 && isValidCardId()) {
       setTimeout(() => {
         forceRefresh();
-        dispatch(cardsApi.util.invalidateTags([{ type: "cards", id: currentCardId }]));
+        dispatch(cardsApi.util.invalidateTags([{ type: "cards", id: cardId }]));
       }, 100);
     }
-  }, [popUpType, forceRefresh, dispatch, currentCardId, isValidCardId]);
+  }, [popUpType, forceRefresh, dispatch, cardId, isValidCardId]);
 
-  // ✅ ИСПРАВЛЕНИЕ: Функция для рендеринга попапов с гарантированной передачей cardId
+  // Функция для рендеринга попапов
   const renderPopup = () => {
-    if (!isValidCardId) {
+    if (!isValidCardId()) {
       return (
         <Box
           sx={{
@@ -152,45 +165,42 @@ export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...
         >
           ❌ Ошибка: Некорректный ID карточки
           <div style={{ fontSize: "12px", marginTop: "5px", color: "#666" }}>
-            Получен: {JSON.stringify(currentCardId)}
+            Получен: {JSON.stringify(cardId)}
           </div>
         </Box>
       );
     }
 
-    // ✅ ИСПРАВЛЕНИЕ: Явно передаем currentCardId во все компоненты
-    console.log(`Rendering popup type ${popUpType} with cardId:`, currentCardId);
+    console.log(`Rendering popup type ${popUpType} for cardId:`, cardId);
 
     switch (popUpType) {
       case 10:
-        return <AllSettingsOfCard chipsArr={allChips} cardId={currentCardId} {...cardDataState} />;
+        return <AllSettingsOfCard chipsArr={allChips} cardId={cardId} {...cardDataState} />;
       case 1:
         return (
-          <ChangeChipsPallet
-            cardId={currentCardId}
-            chipsArr={allChips}
-            onChipsUpdate={forceRefresh}
-          />
+          <ChangeChipsPallet cardId={cardId} chipsArr={allChips} onChipsUpdate={forceRefresh} />
         );
       case 2:
-        return <ChangeUsers cardId={currentCardId} />;
+        return <ChangeUsers cardId={cardId} />;
       case 3:
-        return <CreateNewChip id={currentCardId} onChipCreated={forceRefresh} />;
+        return <CreateNewChip id={cardId} onChipCreated={forceRefresh} />;
       case 4:
-        // ✅ ИСПРАВЛЕНИЕ: Убеждаемся что cardId передается корректно
-        console.log(
-          "Opening DatesAndTimePallet with cardId:",
-          currentCardId,
-          "type:",
-          typeof currentCardId
-        );
-        return <DatesAndTimePallet cardId={currentCardId} />;
+        return <DatesAndTimePallet cardId={cardId} />;
       default:
         return null;
     }
   };
 
-  if (!isValidCardId) {
+  // Обработчики кликов на кнопки
+  const handleOpenCard = useCallback(() => dispatch(popUpToOpen(10)), [dispatch]);
+  const handleChangeChips = useCallback(() => dispatch(popUpToOpen(1)), [dispatch]);
+  const handleChangeUsers = useCallback(() => dispatch(popUpToOpen(2)), [dispatch]);
+  const handleChangeDates = useCallback(() => {
+    dispatch(popUpToOpen(4));
+  }, [dispatch]);
+
+  // Основной рендер с улучшенной обработкой ошибок
+  if (!isValidCardId()) {
     return (
       <Box sx={{ display: "flex", flexDirection: "row", margin: "10px" }}>
         <Box
@@ -203,6 +213,9 @@ export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...
           }}
         >
           ❌ Ошибка: Некорректный ID карточки
+          <div style={{ fontSize: "12px", marginTop: "5px", color: "#666" }}>
+            Получен: {JSON.stringify(cardId)}
+          </div>
         </Box>
       </Box>
     );
@@ -211,7 +224,42 @@ export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...
   if (isLoading && !cardDataState) {
     return (
       <Box sx={{ display: "flex", flexDirection: "row", margin: "10px" }}>
-        <Box sx={{ margin: "10px", padding: "20px", color: "#1976d2" }}>⏳ Загрузка...</Box>
+        <Box sx={{ margin: "10px", padding: "20px", color: "#1976d2" }}>
+          ⏳ Загрузка данных карточки...
+        </Box>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ display: "flex", flexDirection: "row", margin: "10px" }}>
+        <Box
+          sx={{
+            margin: "10px",
+            padding: "20px",
+            color: "#c62828",
+            backgroundColor: "#ffebee",
+            borderRadius: "4px",
+          }}
+        >
+          ❌ {error}
+          <button
+            onClick={forceRefresh}
+            style={{
+              marginTop: "10px",
+              padding: "5px 10px",
+              fontSize: "12px",
+              border: "1px solid #c62828",
+              background: "transparent",
+              color: "#c62828",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            Повторить
+          </button>
+        </Box>
       </Box>
     );
   }
@@ -235,7 +283,7 @@ export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...
           {...currentCardData}
           allChips={allChips}
           inPopup={true}
-          key={`card-preview-${currentCardId}-${refreshTrigger}-${allChips.length}`}
+          key={`card-preview-${cardId}-${refreshTrigger}-${allChips.length}`}
         />
       )}
 
@@ -247,51 +295,49 @@ export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...
               color="secondary"
               size="large"
               sx={buttonStyle}
-              onClick={() => dispatch(popUpToOpen(10))}
+              onClick={handleOpenCard}
             >
               Открыть карточку
             </Button>
+
             <Button
               variant="contained"
               color="secondary"
               size="large"
               sx={buttonStyle}
-              onClick={() => dispatch(popUpToOpen(1))}
+              onClick={handleChangeChips}
             >
               Изменить метки
             </Button>
+
             <Button
               variant="contained"
               color="secondary"
               size="large"
               sx={buttonStyle}
-              onClick={() => dispatch(popUpToOpen(2))}
+              onClick={handleChangeUsers}
             >
               Изменить участников
             </Button>
+
             <Button variant="contained" color="secondary" size="large" sx={buttonStyle}>
               Сменить обложку
             </Button>
+
             <Button
               variant="contained"
               color="secondary"
               size="large"
               sx={buttonStyle}
-              onClick={() => {
-                console.log(
-                  "Opening dates popup for cardId:",
-                  currentCardId,
-                  "type:",
-                  typeof currentCardId
-                );
-                dispatch(popUpToOpen(4));
-              }}
+              onClick={handleChangeDates}
             >
               Изменить даты
             </Button>
+
             <Button variant="contained" color="secondary" size="large" sx={buttonStyle}>
               Переместить
             </Button>
+
             <Button variant="contained" color="secondary" size="large" sx={buttonStyle}>
               Архивировать
             </Button>
