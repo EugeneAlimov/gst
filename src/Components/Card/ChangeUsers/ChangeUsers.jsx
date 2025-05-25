@@ -31,11 +31,10 @@ const avatarPictStyle = {
 
 export default function ChangeUsers({ cardId }) {
   // Добавляем отладку
-  console.log('ChangeUsers received cardId:', cardId);
-  
+
   // Проверяем валидность cardId
-  if (!cardId || cardId === 'undefined' || typeof cardId === 'undefined') {
-    console.error('ChangeUsers: Invalid cardId received:', cardId);
+  if (!cardId || cardId === "undefined" || typeof cardId === "undefined") {
+    console.error("ChangeUsers: Invalid cardId received:", cardId);
     return (
       <Card sx={{ padding: "20px", textAlign: "center" }}>
         <div>Ошибка: Не указан ID карточки</div>
@@ -49,21 +48,14 @@ export default function ChangeUsers({ cardId }) {
 
   const [usersOnCard, setUsersOnCard] = useState({ onCard: [], others: [] });
 
-  // Добавляем отладку для данных карточки
-  console.log('Card data:', cardData);
-  console.log('Card loading:', cardLoading);
-  console.log('Card error:', cardError);
-
   useEffect(() => {
     if (!userData || !cardData) {
-      console.log('Waiting for data - userData:', !!userData, 'cardData:', !!cardData);
       return;
     }
-    
+
     // Безопасное получение списка пользователей карточки
     const userOnCardList = cardData.assigned_users || [];
-    console.log('Users on card:', userOnCardList);
-    
+
     const users = {
       onCard: [],
       others: [],
@@ -78,127 +70,114 @@ export default function ChangeUsers({ cardId }) {
       }
     });
 
-    console.log('Processed users:', users);
     setUsersOnCard(users);
   }, [cardData, userData]);
 
   const addUserToCard = async (userId) => {
-    console.log('Adding user to card:', userId, 'cardId:', cardId);
-    
     if (!cardData) {
-      console.error('No card data available');
+      console.error("No card data available");
       return;
     }
-    
+
     // Безопасное получение текущего списка пользователей
     const currentUsers = cardData.assigned_users || [];
     const newUsers = [...currentUsers];
-    
+
     if (!newUsers.includes(userId)) {
       newUsers.push(userId);
     }
-    
+
     const requestData = {
-      assigned_users: newUsers.sort()
+      assigned_users: newUsers.sort(),
     };
-    
-    console.log('FINAL REQUEST DATA:', requestData);
-    console.log('REQUEST URL:', `http://127.0.0.1:8000/api/v1/card/${cardId}/`);
-    
+
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/v1/card/${cardId}/`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(requestData),
       });
-      
-      console.log('Response status:', response.status);
-      
+
       if (response.ok) {
         const result = await response.json();
-        console.log('User added successfully:', result);
-        
+
         // Немедленно обновляем локальное состояние
-        const userToMove = userData.find(user => user.id === userId);
+        const userToMove = userData.find((user) => user.id === userId);
         if (userToMove) {
-          setUsersOnCard(prev => ({
+          setUsersOnCard((prev) => ({
             onCard: [...prev.onCard, userToMove],
-            others: prev.others.filter(user => user.id !== userId)
+            others: prev.others.filter((user) => user.id !== userId),
           }));
         }
-        
+
         // Инвалидируем кэш RTK Query для синхронизации
-        dispatch(cardsApi.util.invalidateTags([
-          { type: "cards", id: cardId },
-          { type: "cards", id: "LIST" }
-        ]));
+        dispatch(
+          cardsApi.util.invalidateTags([
+            { type: "cards", id: cardId },
+            { type: "cards", id: "LIST" },
+          ])
+        );
       } else {
         const errorText = await response.text();
-        console.error('Server error:', errorText);
+        console.error("Server error:", errorText);
       }
     } catch (error) {
-      console.error('Network error adding user to card:', error);
+      console.error("Network error adding user to card:", error);
     }
   };
 
   const removeUserFromCard = async (userId) => {
-    console.log('Removing user from card:', userId, 'cardId:', cardId);
-    
     if (!cardData) {
-      console.error('No card data available');
+      console.error("No card data available");
       return;
     }
-    
+
     // Безопасное получение текущего списка пользователей
     const currentUsers = cardData.assigned_users || [];
-    const newUsers = currentUsers.filter(id => id !== userId).sort();
-    
-    const requestData = {
-      assigned_users: newUsers
-    };
+    const newUsers = currentUsers.filter((id) => id !== userId).sort();
 
-    console.log('FINAL REQUEST DATA:', requestData);
-    console.log('REQUEST URL:', `http://127.0.0.1:8000/api/v1/card/${cardId}/`);
+    const requestData = {
+      assigned_users: newUsers,
+    };
 
     try {
       const response = await fetch(`http://127.0.0.1:8000/api/v1/card/${cardId}/`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(requestData),
       });
-      
-      console.log('Response status:', response.status);
-      
+
       if (response.ok) {
         const result = await response.json();
-        console.log('User removed successfully:', result);
-        
+
         // Немедленно обновляем локальное состояние
-        const userToMove = userData.find(user => user.id === userId);
+        const userToMove = userData.find((user) => user.id === userId);
         if (userToMove) {
-          setUsersOnCard(prev => ({
-            onCard: prev.onCard.filter(user => user.id !== userId),
-            others: [...prev.others, userToMove]
+          setUsersOnCard((prev) => ({
+            onCard: prev.onCard.filter((user) => user.id !== userId),
+            others: [...prev.others, userToMove],
           }));
         }
-        
+
         // Инвалидируем кэш RTK Query для синхронизации
-        dispatch(cardsApi.util.invalidateTags([
-          { type: "cards", id: cardId },
-          { type: "cards", id: "LIST" }
-        ]));
+        dispatch(
+          cardsApi.util.invalidateTags([
+            { type: "cards", id: cardId },
+            { type: "cards", id: "LIST" },
+          ])
+        );
       } else {
         const errorText = await response.text();
-        console.error('Server error:', errorText);
+        console.error("Server error:", errorText);
       }
     } catch (error) {
-      console.error('Network error removing user from card:', error);
+      console.error("Network error removing user from card:", error);
     }
   };
 

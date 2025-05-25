@@ -26,15 +26,12 @@ export default function Header({ text, column_id }) {
   const [inColumn, setInColumn] = useState({});
   const [anchorInColumn, setAnchorInColumn] = useState(null);
 
-
   useEffect(() => {
     const col = columnsList.find((el) => el.id === column_id);
     setInColumn(col);
   }, [columnsList, columnsList]);
 
   const handleOpenInColumnMenu = (event) => {
-    console.log('g ughiuhkl');
-    
     setAnchorElUser(event.currentTarget);
   };
 
@@ -63,31 +60,29 @@ export default function Header({ text, column_id }) {
           {inColumn.name}
         </Link>
         <Menu
-                sx={{ mt: "45px" }}
-                id="menu-appbar"
-                anchorEl={anchorInColumn}
-                anchorOrigin={{
-                  vertical: "top",
-                  horizontal: "right",
-                }}
-                keepMounted
-                transformOrigin={{
-                  vertical: "top",
-                  horizontal: "right",
-                }}
-                open={Boolean(anchorInColumn)}
-                onClose={handleCloseInColumnMenu}
-                onClick={handleOpenInColumnMenu}
-              >
-                <MenuItem key={1} onClick={handleCloseInColumnMenu}>
-                  <Typography textAlign="center">{"Архивировать"}</Typography>
-                </MenuItem>
-                <MenuItem key={2} onClick={handleCloseInColumnMenu}>
-                  <Typography textAlign="center">{"Архивировать"}</Typography>
-                </MenuItem>
-
-              </Menu>
-
+          sx={{ mt: "45px" }}
+          id="menu-appbar"
+          anchorEl={anchorInColumn}
+          anchorOrigin={{
+            vertical: "top",
+            horizontal: "right",
+          }}
+          keepMounted
+          transformOrigin={{
+            vertical: "top",
+            horizontal: "right",
+          }}
+          open={Boolean(anchorInColumn)}
+          onClose={handleCloseInColumnMenu}
+          onClick={handleOpenInColumnMenu}
+        >
+          <MenuItem key={1} onClick={handleCloseInColumnMenu}>
+            <Typography textAlign="center">{"Архивировать"}</Typography>
+          </MenuItem>
+          <MenuItem key={2} onClick={handleCloseInColumnMenu}>
+            <Typography textAlign="center">{"Архивировать"}</Typography>
+          </MenuItem>
+        </Menu>
       </Typography>
     </>
   );

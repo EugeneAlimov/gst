@@ -18,19 +18,7 @@ const cardSlice = createSlice({
       state.card = actions.payload;
     },
   },
-  extraReducers(builder) {
-    // builder.addCase(getColumns.fulfilled, (state, action) => {
-    //   state.columns = action.payload;
-    // });
-    // builder.addCase(getColumnDetail.fulfilled, (state, action) => {
-    //   console.log("action ", action.payload);
-    //   state.columns = action.payload
-    //   state.name = action.payload.name;
-    //   state.created = action.payload.created
-    //   state.updated = action.payload.updated
-    //   state.users = action.payload.user
-    // });
-  },
+  extraReducers(builder) {},
 });
 
 export default cardSlice.reducer;

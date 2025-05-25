@@ -55,7 +55,6 @@ export const register = createAsyncThunk<LoginResponse, RegisterCredentials>(
 export const logIn = createAsyncThunk<LoginResponse, LoginCredentials>(
   "auth/login",
   async (credentials) => {
-    console.log("credentials ", credentials);
     try {
       const { data } = await axios.post("/token/", credentials);
 
@@ -114,7 +113,6 @@ export const refreshUser = createAsyncThunk("auth/refreshUser", async (_, thunkA
     });
     return data;
   } catch (error) {
-    console.log("error ", error);
     return thunkAPI.rejectWithValue(error);
   }
 });

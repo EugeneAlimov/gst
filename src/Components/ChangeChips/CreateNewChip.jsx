@@ -135,22 +135,17 @@ export default function CreateNewChip({ id, onChipCreated }) {
     try {
       if (!isEdit) {
         const newChip = await createNewChip(chipData).unwrap();
-        console.log("Chip created successfully", newChip);
       } else {
         const updatedChip = await chipUpdate({
           chipId: targetChipId,
           updateChipObj: updateChipData,
         }).unwrap();
 
-        console.log("Chip updated successfully", updatedChip);
-
         // Обновление кэша...
         setTimeout(() => {
-          console.log("Clearing all RTK Query cache...");
           dispatch(chipsApi.util.resetApiState());
 
           setTimeout(() => {
-            console.log("Reloading chips data...");
             dispatch(
               chipsApi.endpoints.getAllChips.initiate(undefined, {
                 forceRefetch: true,

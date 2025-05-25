@@ -26,15 +26,8 @@ export default function Cheeps({ chipsArr, cardChips, cardId }) {
   // Фильтруем только метки, привязанные к карточке
   const cardChipsData = useMemo(() => {
     if (!chipsArr || !cardChips) {
-      console.log("No chips data available for card chips filtering");
       return [];
     }
-
-    console.log("Filtering card chips:", {
-      allChipsCount: chipsArr.length,
-      cardChipsIds: cardChips,
-      sampleAllChip: chipsArr[0],
-    });
 
     // Находим только те чипы, которые привязаны к карточке
     const result = chipsArr.filter((chip) => cardChips.includes(chip.id));
