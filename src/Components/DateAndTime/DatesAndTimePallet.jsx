@@ -51,7 +51,7 @@ const useDateTimeState = () => {
   const [finishTime, setFinishTime] = useState(defaultValue);
   const [isStartEnabled, setIsStartEnabled] = useState(false);
   const [isFinishEnabled, setIsFinishEnabled] = useState(false);
-  const [reminderMinutes, setReminderMinutes] = useState(-10);
+  const [reminderOffsetMinutes, setReminderOffsetMinutes] = useState(-10); // Изменено название
 
   // Утилитарные функции
   const isEmptyDate = useCallback((date) => {
@@ -88,15 +88,17 @@ const useDateTimeState = () => {
     return finishDateTime;
   }, [finishDate, finishTime]);
 
-  const getReminderDateTime = useCallback(() => {
-    if (!isFinishEnabled || reminderMinutes === -10) {
-      return EMPTY_DATE;
-    }
-
+  // Новая функция для вычисления времени до окончания в минутах
+  const getTimeToFinishInMinutes = useCallback(() => {
+    if (!isFinishEnabled) return null;
+    
+    const now = new Date();
     const finishDateTime = createFinishDateTime();
-    const reminderDateTime = sub(finishDateTime, { minutes: reminderMinutes });
-    return reminderDateTime.toISOString();
-  }, [isFinishEnabled, reminderMinutes, createFinishDateTime]);
+    const diffInMinutes = differenceInMinutes(finishDateTime, now);
+    
+    console.log("⏰ Время до окончания:", diffInMinutes, "минут");
+    return Math.max(0, diffInMinutes); // Не может быть отрицательным
+  }, [isFinishEnabled, createFinishDateTime]);
 
   // Инициализация данных
   const initializeFromData = useCallback(
@@ -108,22 +110,20 @@ const useDateTimeState = () => {
 
       console.log("🔄 Инициализация с данными из БД:", data);
 
-      const { date_time_start, date_time_finish, date_time_reminder } = data;
+      const { date_time_start, date_time_finish, reminder_offset_minutes } = data;
 
-      console.log("📅 Сырые даты из БД:", {
+      console.log("📅 Сырые данные из БД:", {
         start: date_time_start,
         finish: date_time_finish,
-        reminder: date_time_reminder,
+        reminder_offset: reminder_offset_minutes,
       });
 
       const isStartEmpty = isEmptyDate(date_time_start);
       const isFinishEmpty = isEmptyDate(date_time_finish);
-      const isReminderEmpty = isEmptyDate(date_time_reminder);
 
       console.log("🔍 Проверка пустых дат:", {
         startEmpty: isStartEmpty,
         finishEmpty: isFinishEmpty,
-        reminderEmpty: isReminderEmpty,
       });
 
       // Устанавливаем даты
@@ -151,17 +151,10 @@ const useDateTimeState = () => {
         finishEnabled: !isFinishEmpty,
       });
 
-      // Вычисляем интервал напоминания
-      if (!isReminderEmpty && !isFinishEmpty) {
-        const finishDateTime = new Date(date_time_finish);
-        const reminderDateTime = new Date(date_time_reminder);
-        const difference = differenceInMinutes(finishDateTime, reminderDateTime);
-        setReminderMinutes(difference);
-        console.log("🔔 Установлено напоминание:", difference, "минут");
-      } else {
-        setReminderMinutes(-10);
-        console.log("🔔 Напоминание отключено");
-      }
+      // Устанавливаем смещение напоминания (новая логика)
+      const offsetMinutes = reminder_offset_minutes || -10;
+      setReminderOffsetMinutes(offsetMinutes);
+      console.log("🔔 Установлено смещение напоминания:", offsetMinutes, "минут");
     },
     [isEmptyDate]
   );
@@ -180,16 +173,16 @@ const useDateTimeState = () => {
     return null;
   }, [isStartEnabled, isFinishEnabled, startDate, finishDate]);
 
-  // Объект для сохранения
+  // Объект для сохранения (ИЗМЕНЕНО: теперь отправляем смещение)
   const getSaveObject = useCallback(() => {
     const finishDateTime = createFinishDateTime();
 
     return {
       date_time_start: isStartEnabled ? startDate.toISOString() : EMPTY_DATE,
       date_time_finish: isFinishEnabled ? finishDateTime.toISOString() : EMPTY_DATE,
-      date_time_reminder: getReminderDateTime(),
+      reminder_offset_minutes: reminderOffsetMinutes === -10 ? null : reminderOffsetMinutes, // Отправляем смещение
     };
-  }, [isStartEnabled, isFinishEnabled, startDate, createFinishDateTime, getReminderDateTime]);
+  }, [isStartEnabled, isFinishEnabled, startDate, createFinishDateTime, reminderOffsetMinutes]);
 
   return {
     // Состояние
@@ -198,7 +191,7 @@ const useDateTimeState = () => {
     finishTime,
     isStartEnabled,
     isFinishEnabled,
-    reminderMinutes,
+    reminderOffsetMinutes, // Изменено название
     calendarValue,
 
     // Сеттеры
@@ -207,37 +200,142 @@ const useDateTimeState = () => {
     setFinishTime,
     setIsStartEnabled,
     setIsFinishEnabled,
-    setReminderMinutes,
+    setReminderOffsetMinutes, // Изменено название
 
     // Утилиты
     initializeFromData,
     getSaveObject,
     createFinishDateTime,
-    getReminderDateTime,
+    getTimeToFinishInMinutes, // Новая функция
   };
 };
 
-// Кастомный хук для валидации
-const useDateValidation = (startDate, finishDate, isStartEnabled, isFinishEnabled) => {
+// Кастомный хук для валидации (ОБНОВЛЕН)
+const useDateValidation = (startDate, finishDate, isStartEnabled, isFinishEnabled, reminderOffsetMinutes, getTimeToFinishInMinutes, originalStartDate, originalEndDate) => {
   const validationErrors = useMemo(() => {
     const errors = [];
 
+    console.log("🔍 Начало валидации дат. Текущие значения:", {
+      isStartEnabled,
+      isFinishEnabled, 
+      startDate,
+      finishDate,
+      reminderOffsetMinutes
+    });
+
+    // Проверка является ли дата "исходной" (уже была в БД)
+    const isOriginalDate = (newDate, originalDate) => {
+      if (!originalDate || !newDate) return false;
+      
+      try {
+        const original = new Date(originalDate).toDateString();
+        const current = new Date(newDate).toDateString();
+        return original === current;
+      } catch {
+        return false;
+      }
+    };
+
+    // Валидация дат на прошедшее время
+    const now = new Date();
+    
+    if (isStartEnabled && startDate) {
+      if (!isOriginalDate(startDate, originalStartDate)) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Начало сегодняшнего дня
+        
+        const startOfDayDate = new Date(startDate);
+        startOfDayDate.setHours(0, 0, 0, 0); // Начало выбранного дня
+        
+        console.log("🔍 Валидация даты начала:", {
+          startDate,
+          startOfDayDate,
+          today,
+          isPast: startOfDayDate < today,
+          isOriginal: isOriginalDate(startDate, originalStartDate)
+        });
+        
+        // Блокируем только даты ДО сегодняшнего дня
+        if (startOfDayDate < today) {
+          errors.push("Дата начала не может быть в прошлом");
+        }
+      }
+    }
+
+    if (isFinishEnabled && finishDate) {
+      if (!isOriginalDate(finishDate, originalEndDate)) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Начало сегодняшнего дня
+        
+        const finishDay = new Date(finishDate);
+        finishDay.setHours(0, 0, 0, 0); // Начало дня завершения
+        
+        console.log("🔍 Валидация даты завершения:", {
+          finishDate,
+          finishDay,
+          today,
+          isPastDay: finishDay < today,
+          isOriginal: isOriginalDate(finishDate, originalEndDate)
+        });
+        
+        // Если дата завершения до сегодняшнего дня - ошибка
+        if (finishDay < today) {
+          errors.push("Дата завершения не может быть в прошлом");
+        }
+        // Если дата сегодня, но время уже прошло - тоже ошибка  
+        else if (finishDay.getTime() === today.getTime()) {
+          const now = new Date();
+          const finishDateTime = new Date(finishDate);
+          
+          if (finishDateTime <= now) {
+            errors.push("Время завершения не может быть в прошлом");
+          }
+        }
+      }
+    }
+
+    // Оригинальные проверки дат
     if (isStartEnabled && isFinishEnabled) {
       if (startDate >= finishDate) {
         errors.push("Дата начала не может быть позже даты завершения");
       }
     }
 
-    if (isStartEnabled && !isValid(startDate)) {
+    if (isStartEnabled && startDate && !new Date(startDate).getTime()) {
       errors.push("Неверная дата начала");
     }
 
-    if (isFinishEnabled && !isValid(finishDate)) {
+    if (isFinishEnabled && finishDate && !new Date(finishDate).getTime()) {
       errors.push("Неверная дата завершения");
     }
 
+    // НОВАЯ ВАЛИДАЦИЯ: Проверка смещения напоминания
+    if (isFinishEnabled && reminderOffsetMinutes > 0) {
+      const timeToFinishMinutes = getTimeToFinishInMinutes();
+      
+      if (timeToFinishMinutes !== null && reminderOffsetMinutes > timeToFinishMinutes) {
+        const hoursLeft = Math.floor(timeToFinishMinutes / 60);
+        const minutesLeft = timeToFinishMinutes % 60;
+        
+        let timeLeftText = "";
+        if (hoursLeft > 0) {
+          timeLeftText = `${hoursLeft}ч ${minutesLeft}мин`;
+        } else {
+          timeLeftText = `${minutesLeft}мин`;
+        }
+        
+        errors.push(`Нельзя установить напоминание на время, которое уже прошло. До завершения осталось: ${timeLeftText}`);
+      }
+    }
+
+    console.log("🔍 Итоговая валидация:", {
+      errorsCount: errors.length,
+      errors: errors,
+      isValid: errors.length === 0
+    });
+
     return errors;
-  }, [startDate, finishDate, isStartEnabled, isFinishEnabled]);
+  }, [startDate, finishDate, isStartEnabled, isFinishEnabled, reminderOffsetMinutes, getTimeToFinishInMinutes, originalStartDate, originalEndDate]);
 
   const isValidState = validationErrors.length === 0;
 
@@ -277,10 +375,17 @@ export default function DatesAndTimePallet({ cardId }) {
     dateTimeState.startDate,
     dateTimeState.finishDate,
     dateTimeState.isStartEnabled,
-    dateTimeState.isFinishEnabled
+    dateTimeState.isFinishEnabled,
+    dateTimeState.reminderOffsetMinutes,
+    dateTimeState.getTimeToFinishInMinutes,
+    periodData?.date_time_start, // НОВЫЙ: Исходная дата начала
+    periodData?.date_time_finish  // НОВЫЙ: Исходная дата завершения
   );
 
   const hasData = periodData && !isLoading && !error && isValidCardId;
+
+  // НОВОЕ: Получаем статус выполнения задачи
+  const isTaskCompleted = periodData?.is_completed || false;
 
   // Инициализация данных (запускается только при изменении данных)
   useEffect(() => {
@@ -288,7 +393,7 @@ export default function DatesAndTimePallet({ cardId }) {
       console.log("🔄 Инициализация компонента с данными:", periodData);
       dateTimeState.initializeFromData(periodData);
     }
-  }, [hasData, periodData]); // Добавляем periodData для отслеживания изменений
+  }, [hasData, periodData]);
 
   // Принудительное обновление при изменении cardId
   useEffect(() => {
@@ -330,21 +435,37 @@ export default function DatesAndTimePallet({ cardId }) {
     [dateTimeState]
   );
 
+  // ОБНОВЛЕН: теперь работает со смещением и учитывает статус выполнения
   const handleReminderChange = useCallback(
-    (minutes) => {
-      if (!dateTimeState.isFinishEnabled) {
+    (offsetMinutes) => {
+      if (!dateTimeState.isFinishEnabled && offsetMinutes !== -10) {
         console.log("⚠️ Дата завершения не установлена, напоминание недоступно");
         return;
       }
 
-      dateTimeState.setReminderMinutes(minutes);
+      if (isTaskCompleted && offsetMinutes !== -10) {
+        console.log("⚠️ Задача выполнена, напоминания недоступны");
+        return;
+      }
+
+      dateTimeState.setReminderOffsetMinutes(offsetMinutes);
       console.log(
-        "🔔 Установлено напоминание:",
-        minutes === -10 ? "без напоминания" : `за ${minutes} минут`
+        "🔔 Установлено смещение напоминания:",
+        offsetMinutes === -10 ? "без напоминания" : `за ${offsetMinutes} минут`
       );
     },
-    [dateTimeState]
+    [dateTimeState, isTaskCompleted]
   );
+
+  // НОВЫЙ: Обработчик автоматического отключения напоминаний
+  const handleReminderDisabled = useCallback((reason, previousValue) => {
+    console.log(`🔕 Напоминание автоматически отключено. Причина: ${reason}, было: ${previousValue}`);
+    
+    // Здесь можно добавить дополнительную логику, например:
+    // - Показать уведомление пользователю
+    // - Сохранить в истории изменений
+    // - Отправить аналитику
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (!validation.isValid) {
@@ -360,10 +481,10 @@ export default function DatesAndTimePallet({ cardId }) {
     }
 
     const saveObject = dateTimeState.getSaveObject();
-    console.log("💾 Подготовка к сохранению дат в БД:", saveObject);
+    console.log("💾 Подготовка к сохранению дат в БД (со смещением):", saveObject);
 
     // Проверим, что объект содержит правильные поля
-    const requiredFields = ["date_time_start", "date_time_finish", "date_time_reminder"];
+    const requiredFields = ["date_time_start", "date_time_finish", "reminder_offset_minutes"];
     const missingFields = requiredFields.filter((field) => !(field in saveObject));
 
     if (missingFields.length > 0) {
@@ -379,10 +500,10 @@ export default function DatesAndTimePallet({ cardId }) {
 
       // Проверим, что сервер вернул обновленные данные
       if (result && typeof result === "object") {
-        console.log("📅 Проверяем обновленные даты на сервере:");
+        console.log("📅 Проверяем обновленные данные на сервере:");
         console.log("- date_time_start:", result.date_time_start);
         console.log("- date_time_finish:", result.date_time_finish);
-        console.log("- date_time_reminder:", result.date_time_reminder);
+        console.log("- reminder_offset_minutes:", result.reminder_offset_minutes);
       }
 
       // Показываем уведомление пользователю
@@ -393,7 +514,7 @@ export default function DatesAndTimePallet({ cardId }) {
         console.log("🔄 Принудительное обновление данных после сохранения...");
         setTimeout(() => {
           refetch();
-        }, 500); // Небольшая задержка для того чтобы сервер успел сохранить
+        }, 500);
       }
 
       // Закрываем попап после успешного сохранения
@@ -429,10 +550,11 @@ export default function DatesAndTimePallet({ cardId }) {
       return;
     }
 
+    // ОБНОВЛЕНО: очищаем смещение вместо времени напоминания
     const emptyObject = {
       date_time_start: EMPTY_DATE,
       date_time_finish: EMPTY_DATE,
-      date_time_reminder: EMPTY_DATE,
+      reminder_offset_minutes: null, // Изменено
     };
 
     console.log("🗑️ Удаляем даты из БД");
@@ -444,7 +566,7 @@ export default function DatesAndTimePallet({ cardId }) {
       // Сбрасываем локальное состояние
       dateTimeState.setIsStartEnabled(false);
       dateTimeState.setIsFinishEnabled(false);
-      dateTimeState.setReminderMinutes(-10);
+      dateTimeState.setReminderOffsetMinutes(-10); // Обновлено
 
       // Показываем уведомление пользователю
       alert("✅ Даты успешно удалены!");
@@ -625,11 +747,16 @@ export default function DatesAndTimePallet({ cardId }) {
           startDayChecked={dateTimeState.isStartEnabled}
           completitionDayChecked={dateTimeState.isFinishEnabled}
           defaultValue={defaultValue}
+          originalStartDate={periodData?.date_time_start} // НОВЫЙ: Исходная дата начала
+          originalEndDate={periodData?.date_time_finish}   // НОВЫЙ: Исходная дата завершения
         />
 
         <Remainder
-          defaultValue={dateTimeState.reminderMinutes}
+          defaultValue={dateTimeState.reminderOffsetMinutes} // Обновлено
           remaindeBefore={handleReminderChange}
+          isFinishEnabled={dateTimeState.isFinishEnabled} // Новый проп
+          isCompleted={isTaskCompleted} // НОВЫЙ: Передаем статус выполнения
+          onReminderDisabled={handleReminderDisabled} // НОВЫЙ: Callback отключения
         />
 
         <DateAndTimeButtonsGroup
@@ -638,6 +765,7 @@ export default function DatesAndTimePallet({ cardId }) {
           saveChanges={handleSave}
           remove={handleRemove}
           disabled={!validation.isValid}
+          validationErrors={validation.validationErrors} // Передаем детальные ошибки
         />
       </>
     );

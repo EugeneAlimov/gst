@@ -8,6 +8,7 @@ export default function DateAndTimeButtonsGroup({
   saveChanges,
   remove,
   disabled = false,
+  validationErrors = [], // Новый проп для детальных ошибок
 }) {
   // Логика определения состояния кнопок
   const noDateSelected = !startDayChecked && !completitionDayChecked;
@@ -41,6 +42,10 @@ export default function DateAndTimeButtonsGroup({
       return "Выберите хотя бы одну дату для сохранения";
     }
     if (disabled) {
+      // Если есть конкретные ошибки валидации, показываем их
+      if (validationErrors.length > 0) {
+        return validationErrors.join("; ");
+      }
       return "Исправьте ошибки валидации перед сохранением";
     }
     return "";
@@ -52,6 +57,11 @@ export default function DateAndTimeButtonsGroup({
     }
     return "";
   };
+
+  // Определяем есть ли ошибки с напоминаниями
+  const hasReminderErrors = validationErrors.some(error => 
+    error.includes("напоминание") || error.includes("прошло")
+  );
 
   return (
     <Box
@@ -108,10 +118,11 @@ export default function DateAndTimeButtonsGroup({
         sx={{
           marginTop: "8px",
           padding: "8px",
-          backgroundColor: "#f5f5f5",
+          backgroundColor: disabled && hasReminderErrors ? "#ffebee" : "#f5f5f5",
           borderRadius: "4px",
           width: "100%",
           textAlign: "center",
+          border: disabled && hasReminderErrors ? "1px solid #ffcdd2" : "none",
         }}
       >
         <Box sx={{ fontSize: "12px", color: "#666", lineHeight: 1.4 }}>
@@ -130,12 +141,51 @@ export default function DateAndTimeButtonsGroup({
           )}
         </Box>
 
-        {disabled && (
+        {/* Детальные ошибки валидации */}
+        {disabled && validationErrors.length > 0 && (
+          <Box sx={{ marginTop: "8px" }}>
+            {validationErrors.map((error, index) => (
+              <Box 
+                key={index}
+                sx={{ 
+                  fontSize: "11px", 
+                  color: hasReminderErrors ? "#d32f2f" : "#ff9800", 
+                  marginTop: index > 0 ? "4px" : "0",
+                  lineHeight: 1.3,
+                }}
+              >
+                {hasReminderErrors ? "🔔" : "⚠️"} {error}
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {/* Общее сообщение об ошибках */}
+        {disabled && validationErrors.length === 0 && (
           <Box sx={{ fontSize: "11px", color: "#d32f2f", marginTop: "4px" }}>
             ⚠️ Исправьте ошибки валидации
           </Box>
         )}
       </Box>
+
+      {/* Дополнительная помощь для ошибок напоминаний */}
+      {hasReminderErrors && (
+        <Box
+          sx={{
+            marginTop: "4px",
+            padding: "6px",
+            backgroundColor: "#e3f2fd",
+            borderRadius: "4px",
+            width: "100%",
+            textAlign: "center",
+            border: "1px solid #bbdefb",
+          }}
+        >
+          <Box sx={{ fontSize: "11px", color: "#1565c0", lineHeight: 1.3 }}>
+            💡 Совет: Выберите меньший интервал напоминания или перенесите дату завершения
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 }

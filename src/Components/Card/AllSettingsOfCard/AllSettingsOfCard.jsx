@@ -24,6 +24,8 @@ import Checklist from "./Checklist";
 export default function AllSettingsOfCard({
   date_time_finish,
   date_time_start,
+  is_completed,
+  reminder_offset_minutes,
   status,
   text,
   user,
@@ -63,6 +65,9 @@ export default function AllSettingsOfCard({
                   date_time_finish={date_time_finish}
                   date_time_start={date_time_start}
                   status={status || 0}
+                  cardId={id} // Передаем ID карточки
+                  is_completed={is_completed} // Передаем статус выполнения
+                  reminder_offset_minutes={reminder_offset_minutes} // Передаем напоминания
                 />
                 <Description />
                 <Checklist />
