@@ -163,6 +163,186 @@ class Column(models.Model):
         return self.name
 
 
+class ReminderLog(models.Model):
+    """
+    Модель для логирования всех изменений напоминаний.
+    Используется для аналитики и отслеживания действий пользователей.
+    """
+
+    # Основные связи
+    card = models.ForeignKey(
+        'Card',
+        on_delete=models.CASCADE,
+        related_name='reminder_logs',
+        verbose_name='Карточка'
+    )
+    user = models.ForeignKey(
+        UserProfile,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reminder_logs',
+        verbose_name='Пользователь'
+    )
+
+    # Данные об изменении
+    old_offset_minutes = models.IntegerField(
+        null=True, blank=True,
+        verbose_name='Предыдущее смещение (минуты)'
+    )
+    new_offset_minutes = models.IntegerField(
+        null=True, blank=True,
+        verbose_name='Новое смещение (минуты)'
+    )
+
+    # Тип действия
+    ACTION_CHOICES = [
+        ('created', 'Создано напоминание'),
+        ('updated', 'Изменено напоминание'),
+        ('disabled', 'Отключено пользователем'),
+        ('auto_disabled', 'Автоматически отключено при выполнении'),
+        ('sent', 'Напоминание отправлено'),
+        ('failed', 'Ошибка отправки напоминания'),
+        ('cancelled', 'Отменено из-за удаления карточки'),
+    ]
+    action = models.CharField(
+        max_length=20,
+        choices=ACTION_CHOICES,
+        verbose_name='Действие'
+    )
+
+    # Дополнительная информация
+    timezone_info = models.CharField(
+        max_length=100,
+        null=True, blank=True,
+        verbose_name='Часовой пояс пользователя'
+    )
+    user_agent = models.TextField(
+        null=True, blank=True,
+        verbose_name='User Agent браузера'
+    )
+    ip_address = models.GenericIPAddressField(
+        null=True, blank=True,
+        verbose_name='IP адрес'
+    )
+
+    # Системная информация
+    timestamp = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Время действия'
+    )
+    error_message = models.TextField(
+        null=True, blank=True,
+        verbose_name='Сообщение об ошибке'
+    )
+
+    # Метаданные для аналитики
+    card_due_date = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name='Дата завершения карточки на момент действия'
+    )
+    reminder_calculated_time = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name='Вычисленное время напоминания'
+    )
+
+    class Meta:
+        verbose_name = 'Лог напоминания'
+        verbose_name_plural = 'Логи напоминаний'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['card', 'timestamp']),
+            models.Index(fields=['user', 'timestamp']),
+            models.Index(fields=['action', 'timestamp']),
+            models.Index(fields=['timestamp']),  # для общей аналитики
+        ]
+
+    def __str__(self):
+        user_info = f" пользователем {self.user.username}" if self.user else ""
+        return f"{self.get_action_display()} для карточки '{self.card.name}'{user_info} ({self.timestamp.strftime('%d.%m.%Y %H:%M')})"
+
+    def get_offset_change_text(self):
+        """Возвращает текстовое описание изменения смещения"""
+        if self.old_offset_minutes is None and self.new_offset_minutes is not None:
+            return f"Установлено: за {self.new_offset_minutes} мин"
+        elif self.old_offset_minutes is not None and self.new_offset_minutes is None:
+            return f"Отключено (было: за {self.old_offset_minutes} мин)"
+        elif self.old_offset_minutes != self.new_offset_minutes:
+            return f"Изменено: за {self.old_offset_minutes} мин → за {self.new_offset_minutes} мин"
+        else:
+            return "Без изменений"
+
+    @classmethod
+    def log_reminder_change(cls, card, user, old_offset, new_offset, action, **kwargs):
+        """
+        Удобный метод для создания записи лога
+
+        Args:
+            card: экземпляр Card
+            user: экземпляр UserProfile или None
+            old_offset: предыдущее смещение в минутах или None
+            new_offset: новое смещение в минутах или None
+            action: тип действия из ACTION_CHOICES
+            **kwargs: дополнительные поля (timezone_info, user_agent, etc.)
+        """
+        # Вычисляем reminder_calculated_time если есть новое смещение
+        calculated_time = None
+        if new_offset and card.date_time_finish:
+            from datetime import timedelta
+            calculated_time = card.date_time_finish - timedelta(minutes=new_offset)
+
+        return cls.objects.create(
+            card=card,
+            user=user,
+            old_offset_minutes=old_offset,
+            new_offset_minutes=new_offset,
+            action=action,
+            card_due_date=card.date_time_finish,
+            reminder_calculated_time=calculated_time,
+            **kwargs
+        )
+
+    @classmethod
+    def get_analytics_data(cls, card=None, user=None, date_from=None, date_to=None):
+        """
+        Получить аналитические данные по логам
+
+        Returns:
+            dict: статистика по действиям
+        """
+        queryset = cls.objects.all()
+
+        if card:
+            queryset = queryset.filter(card=card)
+        if user:
+            queryset = queryset.filter(user=user)
+        if date_from:
+            queryset = queryset.filter(timestamp__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(timestamp__lte=date_to)
+
+        # Группировка по действиям
+        from django.db.models import Count
+        actions_stats = queryset.values('action').annotate(
+            count=Count('id')
+        ).order_by('-count')
+
+        # Самые популярные смещения
+        popular_offsets = queryset.filter(
+            action__in=['created', 'updated'],
+            new_offset_minutes__isnull=False
+        ).values('new_offset_minutes').annotate(
+            count=Count('id')
+        ).order_by('-count')[:10]
+
+        return {
+            'total_logs': queryset.count(),
+            'actions_distribution': list(actions_stats),
+            'popular_offsets': list(popular_offsets),
+            'unique_cards': queryset.values('card').distinct().count(),
+            'unique_users': queryset.filter(user__isnull=False).values('user').distinct().count(),
+        }
+
+
 class Card(models.Model):
     """
     Карточка задачи.
