@@ -84,28 +84,18 @@ function TaskCard({
 
   const processedChips = useMemo(() => {
     if (!allChips || !chips) {
-      console.log(`Card ${id}: No chips data available`, { allChips: !!allChips, chips: !!chips });
       return [];
     }
-
-    console.log(`Card ${id}: Processing chips`, {
-      chipsCount: chips.length,
-      allChipsCount: allChips.length,
-      chipIds: chips,
-      sampleAllChip: allChips[0],
-    });
 
     const result = chips
       .map((chip) => {
         const foundChip = allChips.find((el) => el.id === chip);
         if (!foundChip) {
-          console.log(`Card ${id}: Chip with id ${chip} not found in allChips`);
         }
         return foundChip;
       })
       .filter(Boolean);
 
-    console.log(`Card ${id}: Processed ${result.length} chips from ${chips.length} chip IDs`);
     return result;
   }, [allChips, chips, id]);
 
@@ -128,12 +118,6 @@ function TaskCard({
   }, [allChips]);
 
   useEffect(() => {
-    console.log(`Card ${id}: Updating chips array with key change`, {
-      oldCount: chipsArr.length,
-      newCount: processedChips.length,
-      inPopup,
-      updateKey: chipsUpdateKey.substring(0, 100) + "...", // обрезаем для читаемости
-    });
     setChipsArr(processedChips);
   }, [processedChips, id, inPopup, chipsUpdateKey]);
 

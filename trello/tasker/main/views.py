@@ -555,16 +555,17 @@ class ChipViewSet(viewsets.ModelViewSet):
         # Подготавливаем данные для сериализатора
         data = {}
 
-        # Обрабатываем название чипа
+        # Обрабатываем название чипа - РАЗРЕШАЕМ ПУСТОЕ
         name = request.data.get('name') or request.data.get('text', '').strip()
-        if not name:
-            return Response(
-                {'error': 'Необходимо указать название чипа'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        data['name'] = name
+        # Убираем проверку на обязательность!
+        # if not name:
+        #     return Response(
+        #         {'error': 'Необходимо указать название чипа'},
+        #         status=status.HTTP_400_BAD_REQUEST
+        #     )
+        data['name'] = name  # Может быть пустым
 
-        # Обрабатываем color_id
+        # Обрабатываем color_id - ТОЛЬКО ЭТО ОБЯЗАТЕЛЬНО
         color_id = request.data.get('color_id')
         if not color_id:
             return Response(
@@ -588,14 +589,15 @@ class ChipViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
 
+        # Логируем исходные данные
         print(f"Updating chip {instance.id}, old updated: {instance.updated}")
 
         # Подготавливаем данные для сериализатора
         data = {}
 
-        # Обрабатываем название чипа
+        # Обрабатываем название чипа - РАЗРЕШАЕМ ПУСТОЕ
         name = request.data.get('name') or request.data.get('text')
-        if name:
+        if name is not None:  # Обновляем только если передано
             data['name'] = name.strip()
 
         # Обрабатываем color_id
@@ -608,8 +610,13 @@ class ChipViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             chip = serializer.save()
 
+            # Логируем результат
+            print(f"Chip updated: {chip.id}, new updated: {chip.updated}")
+            print(f"Serialized data: {serializer.data}")
+
             return Response(serializer.data)
         else:
+            print("Update validation errors:", serializer.errors)  # Для отладки
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

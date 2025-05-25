@@ -41,7 +41,6 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
 
   // Функция для загрузки данных карточки
   const fetchCardData = useCallback(async () => {
-    console.log("Fetching card data for card:", cardId);
     setIsLoading(true);
 
     try {
@@ -57,13 +56,10 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Fetched card data:", data);
         setCardData(data);
       } else {
-        console.error("Failed to fetch card data:", response.status);
       }
     } catch (error) {
-      console.error("Error fetching card data:", error);
     } finally {
       setIsLoading(false);
     }
@@ -71,8 +67,6 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
 
   // Функция для загрузки всех чипов
   const fetchAllChips = useCallback(async () => {
-    console.log("Fetching all chips data");
-
     try {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/chip/`,
@@ -86,14 +80,10 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
 
       if (response.ok) {
         const chips = await response.json();
-        console.log("Fetched all chips:", chips.length);
         setAllChips(chips);
       } else {
-        console.error("Failed to fetch chips:", response.status);
       }
-    } catch (error) {
-      console.error("Error fetching chips:", error);
-    }
+    } catch (error) {}
   }, []);
 
   // Обновляем изначальные чипы при изменении chipsArr
@@ -108,14 +98,12 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
 
   // Функция для принудительного обновления
   const forceRefresh = useCallback(() => {
-    console.log("Force refresh triggered - updating both card and chips");
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
   // Обновляем при возврате к главному меню
   useEffect(() => {
     if (popUpType === 0) {
-      console.log("Returned to main menu, refreshing data");
       // Добавляем небольшую задержку для гарантии обновления
       setTimeout(() => {
         forceRefresh();
@@ -125,13 +113,7 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
     }
   }, [popUpType, forceRefresh, dispatch, cardId]);
 
-  useEffect(() => {
-    console.log("AllChips updated:", {
-      count: allChips?.length,
-      updateKey: allChips?.map((c) => `${c.id}:${c.updated}`).join(","),
-      fullChips: allChips, // Добавляем полные данные для отладки
-    });
-  }, [allChips]);
+  useEffect(() => {}, [allChips]);
 
   // Функция для рендеринга попапов
   const renderPopup = () => {

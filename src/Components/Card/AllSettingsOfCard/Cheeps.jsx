@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
 
 //import MUI components
 import Box from "@mui/material/Box";
@@ -11,29 +12,72 @@ import CardChip from "../CardChipsSection/CardChip";
 //import MUI icons
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 
+//import Redux actions
+import { popUpToOpen, chipData } from "../../../Redux/chip/chip-slice";
+
 //import styles
 import * as Style from "./styleConst";
 import { chipColor } from "../../../constants/colorsConst";
 import { chipStyleCreateNewChip } from "../../../constants/chipContainerStyle";
 
-export default function Cheeps({ chipsArr, chipText }) {
+export default function Cheeps({ chipsArr, cardChips, cardId }) {
+  const dispatch = useDispatch();
+  const { popUpType } = useSelector(chipData);
+
+  // Фильтруем только метки, привязанные к карточке
+  const cardChipsData = useMemo(() => {
+    if (!chipsArr || !cardChips) {
+      console.log('No chips data available for card chips filtering');
+      return [];
+    }
+
+    console.log('Filtering card chips:', {
+      allChipsCount: chipsArr.length,
+      cardChipsIds: cardChips,
+      sampleAllChip: chipsArr[0]
+    });
+
+    // Находим только те чипы, которые привязаны к карточке
+    const result = chipsArr.filter(chip => cardChips.includes(chip.id));
+    
+    console.log(`Card has ${result.length} chips from ${cardChips.length} chip IDs`);
+    return result;
+  }, [chipsArr, cardChips]);
+
+  // Обработчик клика по кнопке добавления метки
+  const handleAddChip = () => {
+    console.log('Add chip button clicked from AllSettingsOfCard!');
+    console.log('Current popUpType:', popUpType);
+    console.log('Card chips:', cardChipsData);
+    console.log('cardId:', cardId);
+    
+    // Открываем окно управления метками
+    dispatch(popUpToOpen(1)); // 1 = ChangeChipsPallet
+  };
+
   return (
     <Box sx={Style.cheepsBox}>
       <Typography sx={Style.text}>Метки</Typography>
       <Box sx={{ display: "flex", flexDirection: "row", flexWrap: "wrap" }}>
-        {chipsArr.map((chip) => {
-          const labelId = `checkbox-list-label-${chip.text}`;
+        {cardChipsData.map((chip) => {
+          const labelId = `checkbox-list-label-${chip.text || chip.name}`;
           return (
             <CardChip
               key={chip.id}
-              color={chipColor[chip.color_number]}
+              color={chipColor[chip.color_number] || chip.color}
               labelId={labelId}
               chipStyle={chipStyleCreateNewChip}
-              chipText={chip.text}
+              chipText={chip.text || chip.name}
+              chip={chip} // Передаем полный объект чипа
             />
           );
         })}
-        <IconButton size="small" sx={Style.addIconButton}>
+        <IconButton 
+          size="small" 
+          sx={Style.addIconButton}
+          onClick={handleAddChip}
+          aria-label="Добавить метку"
+        >
           <AddOutlinedIcon />
         </IconButton>
       </Box>

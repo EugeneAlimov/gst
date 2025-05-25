@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { chipData, popUpToOpen, targetChipData } from "../../Redux/chip/chip-slice";
+import {
+  chipData,
+  popUpSmartClose,
+  popUpToOpen,
+  targetChipData,
+} from "../../Redux/chip/chip-slice";
 
 //import MUI components
 import Card from "@mui/material/Card";
@@ -36,7 +41,6 @@ import { useGetColorPaletteQuery } from "../../Redux/chip/chip-operations";
 
 //import styles
 import { chipStyleCreateNewChip, chipStyleChipContainer } from "../../constants/chipContainerStyle";
-import { cardsApi } from "../../Redux/cards/cards-operations";
 
 export default function CreateNewChip({ id, onChipCreated }) {
   const [chipUpdate] = useUpdateChipMutation();
@@ -54,6 +58,7 @@ export default function CreateNewChip({ id, onChipCreated }) {
   const { targetChipId, targetChipText, targetChipColor, isEdit } = chipDataFromState;
 
   const dispatch = useDispatch();
+  const { sourcePopUp } = useSelector(chipData);
 
   const [newChipColor, setNewChipColor] = useState(null);
   const [newChipText, setNewChipText] = useState("");
@@ -63,8 +68,6 @@ export default function CreateNewChip({ id, onChipCreated }) {
   useEffect(() => {
     if (colorPalette && colorPalette.length > 0) {
       if (isEdit && targetChipColor && targetChipColor.id) {
-        console.log("Editing chip, target color:", targetChipColor); // Для отладки
-
         // Ищем цвет в палитре по ID
         const existingColor = colorPalette.find((color) => color.id === targetChipColor.id);
 
@@ -97,6 +100,11 @@ export default function CreateNewChip({ id, onChipCreated }) {
     }
   }, [isEdit, colorPalette]);
 
+  const goBackToSource = () => {
+    dispatch(targetChipData({ isEdit: false }));
+    dispatch(popUpSmartClose()); // Используем умное закрытие
+  };
+
   const handleDialogOpen = () => {
     setDialogOpen(true);
   };
@@ -105,34 +113,29 @@ export default function CreateNewChip({ id, onChipCreated }) {
     setDialogOpen(false);
   };
 
-  const goToChangeChipPallet = () => {
-    // Сброс состояния и возврат к списку
-    dispatch(targetChipData({ isEdit: false }));
-    dispatch(popUpToOpen(1));
-  };
-
   const chipHandler = async () => {
-    if (!newChipText.trim() || !newChipColor) {
-      console.error("Необходимо указать название и цвет чипа");
+    // Убираем проверку на обязательность текста
+    if (!newChipColor) {
+      console.error("Необходимо указать цвет чипа");
       return;
     }
 
     const chipData = {
-      name: newChipText.trim(),
-      text: newChipText.trim(),
+      name: newChipText.trim() || "", // Разрешаем пустое имя
+      text: newChipText.trim() || "", // Разрешаем пустой текст
       color_id: newChipColor.id,
     };
 
     const updateChipData = {
-      name: newChipText.trim(),
-      text: newChipText.trim(),
+      name: newChipText.trim() || "", // Разрешаем пустое имя
+      text: newChipText.trim() || "", // Разрешаем пустой текст
       color_id: newChipColor.id,
     };
 
     try {
       if (!isEdit) {
-        await createNewChip(chipData).unwrap();
-        console.log("Chip created successfully");
+        const newChip = await createNewChip(chipData).unwrap();
+        console.log("Chip created successfully", newChip);
       } else {
         const updatedChip = await chipUpdate({
           chipId: targetChipId,
@@ -141,7 +144,7 @@ export default function CreateNewChip({ id, onChipCreated }) {
 
         console.log("Chip updated successfully", updatedChip);
 
-        // РАБОЧЕЕ РЕШЕНИЕ - полная очистка кэша
+        // Обновление кэша...
         setTimeout(() => {
           console.log("Clearing all RTK Query cache...");
           dispatch(chipsApi.util.resetApiState());
@@ -153,17 +156,16 @@ export default function CreateNewChip({ id, onChipCreated }) {
                 forceRefetch: true,
               })
             );
-          }, 50);
+          }, 20);
         }, 20);
       }
 
-      // Сброс формы и возврат к списку
+      // Возвращаемся к источнику
       dispatch(targetChipData({ isEdit: false }));
-      dispatch(popUpToOpen(1));
+      dispatch(popUpSmartClose());
 
-      // Уведомляем о завершении операции
       if (onChipCreated) {
-        setTimeout(onChipCreated, 500);
+        setTimeout(onChipCreated, 300);
       }
     } catch (error) {
       console.error("Ошибка при сохранении чипа:", error);
@@ -175,7 +177,6 @@ export default function CreateNewChip({ id, onChipCreated }) {
     try {
       await chipDelete(targetChipId).unwrap();
     } catch (error) {
-      console.error("Ошибка при удалении чипа:", error);
     } finally {
       dispatch(targetChipData({ isEdit: false }));
       dispatch(popUpToOpen(1));
@@ -183,7 +184,6 @@ export default function CreateNewChip({ id, onChipCreated }) {
   };
 
   const setNewChipColorHandle = (color) => {
-    console.log("Color selected:", color); // Для отладки
     setNewChipColor(color);
   };
 
@@ -263,7 +263,7 @@ export default function CreateNewChip({ id, onChipCreated }) {
                 width: "40px",
                 height: "40px",
               }}
-              onClick={goToChangeChipPallet}
+              onClick={goBackToSource}
             >
               <ArrowBackIosNewOutlinedIcon sx={{ fontSize: "18px" }} />
             </IconButton>
@@ -300,13 +300,14 @@ export default function CreateNewChip({ id, onChipCreated }) {
 
           {/* Поле ввода названия */}
           <TextField
-            label="Название"
+            label="Название (необязательно)"
             id="new-name-chip"
             size="small"
             autoFocus={true}
             sx={{ width: "260px", marginBottom: "15px" }}
             value={newChipText}
             onChange={(event) => setNewChipText(event.target.value)}
+            placeholder="Оставьте пустым для цветной метки"
           />
 
           <Typography>Цвет</Typography>
@@ -338,7 +339,7 @@ export default function CreateNewChip({ id, onChipCreated }) {
 
           {/* Кнопки действий */}
           <Button
-            disabled={!newChipText.trim() || !newChipColor}
+            disabled={!newChipColor} // Только цвет обязателен
             variant="contained"
             sx={{
               width: "100%",

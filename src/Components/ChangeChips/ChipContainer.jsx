@@ -11,7 +11,6 @@ import IconButton from "@mui/material/IconButton";
 import ListItemButton from "@mui/material/ListItemButton";
 
 //import constants
-import { chipColor } from "../../constants/colorsConst";
 import { boxStylehipContainer, chipStyleChipContainer } from "../../constants/chipContainerStyle";
 import { popUpToOpen, targetChipData } from "../../Redux/chip/chip-slice";
 
@@ -24,13 +23,12 @@ export default function ChipContainer({
   color,
   labelId,
   id: chipId,
-  cardId,
 }) {
   const dispatch = useDispatch();
 
   // Используем цвет из объекта или fallback на старую логику
   const chipColor = color || (color_number !== undefined ? chipColor[color_number] : null);
-  const displayText = chipName || chipText || "Без названия";
+  const displayText = chipName || chipText;
 
   const editChipHangler = () => {
     dispatch(popUpToOpen(3));
@@ -56,7 +54,6 @@ export default function ChipContainer({
       isEdit: true,
     };
 
-    console.log("Setting target chip data:", targrtChipParameters); // Для отладки
     dispatch(targetChipData(targrtChipParameters));
   };
 

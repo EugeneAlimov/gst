@@ -336,11 +336,20 @@ class Chip(models.Model):
     """
     Метка/чип для карточек с привязкой к цветовой схеме
     """
-    name = models.CharField(max_length=50, verbose_name='Название метки')
+    name = models.CharField(
+        max_length=50,
+        blank=True,  # Разрешаем пустое значение в формах
+        default='',  # Значение по умолчанию
+        verbose_name='Название метки'
+    )
 
     # Связь с цветовой схемой
-    color = models.ForeignKey(Color, on_delete=models.PROTECT,  # Защищаем от случайного удаления цветов
-                              related_name='chips', verbose_name='Цветовая схема')
+    color = models.ForeignKey(
+        Color,
+        on_delete=models.PROTECT,
+        related_name='chips',
+        verbose_name='Цветовая схема'
+    )
 
     # Поля для аудита
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
@@ -352,7 +361,13 @@ class Chip(models.Model):
         ordering = ['name']
 
     def __str__(self):
-        return self.name
+        # Если имя пустое, показываем только ID или цвет (для админки)
+        if self.name:
+            return self.name
+        elif self.color:
+            return f"Цветная метка ({self.color.color_name})"
+        else:
+            return f"Метка #{self.id}"
 
 
 class ChecklistItem(models.Model):

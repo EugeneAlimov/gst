@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { popUpToOpen } from "../../Redux/chip/chip-slice";
 
 //import MUI components
@@ -17,36 +17,35 @@ import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 //import components
 import ChipContainer from "./ChipContainer";
 
+//import Redux
+import { popUpSmartClose, chipData } from "../../Redux/chip/chip-slice";
 import { useGetAllChipsQuery } from "../../Redux/chip/chip-operations";
 
-export default function ChangeChipsPallet({ cardId, chipsArr, onChipsUpdate }) {
+export default function ChangeChipsPallet({ cardId, onChipsUpdate }) {
   const { data: chips } = useGetAllChipsQuery();
   const dispatch = useDispatch();
+  const { sourcePopUp } = useSelector(chipData);
 
   const [buttonsState, setButtonsState] = useState(1);
   const [searchText, setSearchText] = useState("");
   const [cardData, setCardData] = useState(null);
 
+  //умное закрытие. Переход в окно - откуда пришли
+  const handleSmartClose = useCallback(() => {
+    dispatch(popUpSmartClose());
+  }, [dispatch, sourcePopUp]);
+
   // Мемоизируем обработку списка чипов
   const chipList = useMemo(() => {
     if (!chips || !cardData) {
-      console.log("No chips or card data available for chipList");
       return [];
     }
-
-    console.log("Building chipList with:", {
-      chipsCount: chips.length,
-      cardChips: cardData.chips,
-      searchText,
-    });
 
     let arr = JSON.parse(JSON.stringify(chips));
 
     return arr.reduce((accumulator, item) => {
       // ИСПРАВЛЕННАЯ ЛОГИКА: используем актуальные данные карточки
       item.checked = cardData.chips ? cardData.chips.includes(item.id) : false;
-
-      console.log(`Chip ${item.id} (${item.name}): checked = ${item.checked}`);
 
       if (searchText === "") {
         switch (buttonsState) {
@@ -86,12 +85,9 @@ export default function ChangeChipsPallet({ cardId, chipsArr, onChipsUpdate }) {
 
         if (response.ok) {
           const data = await response.json();
-          console.log("Fetched card data for chips selection:", data);
           setCardData(data);
         }
-      } catch (error) {
-        console.error("Error fetching card data:", error);
-      }
+      } catch (error) {}
     };
 
     fetchCardData();
@@ -100,30 +96,20 @@ export default function ChangeChipsPallet({ cardId, chipsArr, onChipsUpdate }) {
   //функция обновления чипов
   const chipRelateToCardUpdate = useCallback(
     async (chipId) => {
-      console.log("=== CHIP RELATE UPDATE START ===");
-      console.log("ChipId:", chipId);
-
       if (!cardData) {
-        console.error("No card data available");
         return;
       }
 
       const currentChips = cardData.chips || [];
-      console.log("Current card chips:", currentChips);
 
       let updatedChipsIds;
       if (currentChips.includes(chipId)) {
-        console.log("Removing chip from card");
         updatedChipsIds = currentChips.filter((id) => id !== chipId);
       } else {
-        console.log("Adding chip to card");
         updatedChipsIds = [...currentChips, chipId];
       }
 
-      console.log("Updated chips IDs:", updatedChipsIds);
-
       try {
-        console.log("Sending update request...");
         const response = await fetch(
           `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/card/${cardId}/`,
           {
@@ -138,7 +124,6 @@ export default function ChangeChipsPallet({ cardId, chipsArr, onChipsUpdate }) {
 
         if (response.ok) {
           const updatedCard = await response.json();
-          console.log("Card updated successfully:", updatedCard);
 
           // ВАЖНО: Обновляем локальное состояние cardData
           setCardData(updatedCard);
@@ -148,13 +133,8 @@ export default function ChangeChipsPallet({ cardId, chipsArr, onChipsUpdate }) {
             setTimeout(onChipsUpdate, 100);
           }
         } else {
-          console.error("Failed to update card:", response.status);
         }
-      } catch (error) {
-        console.error("Error updating card:", error);
-      }
-
-      console.log("=== CHIP RELATE UPDATE END ===");
+      } catch (error) {}
     },
     [cardData, cardId, onChipsUpdate]
   );
@@ -168,7 +148,7 @@ export default function ChangeChipsPallet({ cardId, chipsArr, onChipsUpdate }) {
   const handleButtonState2 = useCallback(() => setButtonsState(2), []);
   const handleButtonState3 = useCallback(() => setButtonsState(3), []);
   const handleCreateNewChip = useCallback(() => dispatch(popUpToOpen(3)), [dispatch]);
-  const handleClose = useCallback(() => dispatch(popUpToOpen(0)), [dispatch]);
+  // const handleClose = useCallback(() => dispatch(popUpToOpen(0)), [dispatch]);
 
   return (
     <Card
@@ -186,7 +166,7 @@ export default function ChangeChipsPallet({ cardId, chipsArr, onChipsUpdate }) {
         title="Метки"
         action={
           <IconButton
-            onClick={handleClose}
+            onClick={handleSmartClose}
             aria-label="Change-Chips-Pallet"
             sx={{ display: "flex", justifyContent: "center", alignItems: "center", right: "-86px" }}
           >

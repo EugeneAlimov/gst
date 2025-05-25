@@ -111,8 +111,8 @@ class ChipSerializer(serializers.ModelSerializer):
     color = ColorSerializer(read_only=True)
     color_id = serializers.IntegerField(write_only=True)
 
-    # Поля для совместимости
-    text = serializers.CharField(source='name')
+    # Поля для совместимости - делаем необязательными
+    text = serializers.CharField(source='name', required=False, allow_blank=True)
     color_number = serializers.IntegerField(source='color.color_number', read_only=True)
 
     class Meta:
@@ -122,6 +122,16 @@ class ChipSerializer(serializers.ModelSerializer):
             # Поля для совместимости
             'text', 'color_number'
         ]
+        # Делаем name необязательным
+        extra_kwargs = {
+            'name': {'required': False, 'allow_blank': True},
+        }
+
+    def create(self, validated_data):
+        """Создание чипа - разрешаем пустое имя"""
+        # Просто создаем чип как есть, без автоматической генерации имени
+        print(f"Creating chip with name: '{validated_data.get('name', '')}'")  # Для отладки
+        return super().create(validated_data)
 
     def update(self, instance, validated_data):
         """Обновление чипа с возвратом полных данных"""
@@ -129,11 +139,12 @@ class ChipSerializer(serializers.ModelSerializer):
             color_id = validated_data.pop('color_id')
             instance.color = Color.objects.get(id=color_id)
 
+        # Обновляем имя только если оно передано
         if 'name' in validated_data:
             instance.name = validated_data['name']
 
-        instance.save()  # Это должно обновить поле updated
-        instance.refresh_from_db()  # Принудительно обновляем данные из БД
+        instance.save()
+        instance.refresh_from_db()
         return instance
 
     def to_representation(self, instance):
