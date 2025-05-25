@@ -1,14 +1,32 @@
-import React from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Tooltip from "@mui/material/Tooltip";
 
 export default function DateAndTimeButtonsGroup({
   startDayChecked,
   completitionDayChecked,
   saveChanges,
   remove,
+  disabled = false, // ✅ Новый проп для валидации
 }) {
   const disabledBtns = !startDayChecked && !completitionDayChecked;
+  const saveDisabled = disabledBtns || disabled;
+
+  const SaveButton = ({ children, ...props }) => {
+    if (disabled) {
+      return (
+        <Tooltip title="Исправьте ошибки валидации перед сохранением">
+          <span>
+            <Button {...props} disabled>
+              {children}
+            </Button>
+          </span>
+        </Tooltip>
+      );
+    }
+
+    return <Button {...props}>{children}</Button>;
+  };
 
   return (
     <Box
@@ -19,7 +37,7 @@ export default function DateAndTimeButtonsGroup({
         width: "100%",
       }}
     >
-      <Button
+      <SaveButton
         variant="contained"
         color="primary"
         sx={{
@@ -28,11 +46,12 @@ export default function DateAndTimeButtonsGroup({
           fontSize: "14px",
           marginBottom: "10px",
         }}
-        disabled={disabledBtns}
+        disabled={saveDisabled}
         onClick={saveChanges}
       >
         Сохранить
-      </Button>
+      </SaveButton>
+
       <Button
         variant="contained"
         color="secondary"
@@ -46,6 +65,10 @@ export default function DateAndTimeButtonsGroup({
           color: "black",
           "&:hover": {
             backgroundColor: "#e3e3e3",
+          },
+          "&:disabled": {
+            backgroundColor: "#f5f5f5",
+            color: "#999",
           },
         }}
         disabled={disabledBtns}

@@ -1,10 +1,10 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 
 import { useDispatch } from "react-redux";
 import { popUpToOpen } from "../../Redux/chip/chip-slice";
 
-import { sub, formatISO, differenceInMinutes } from "date-fns";
+import { sub, formatISO, differenceInMinutes, isValid } from "date-fns";
 
 import Card from "@mui/material/Card";
 import CardHeader from "@mui/material/CardHeader";
@@ -20,6 +20,7 @@ import {
   useUpdateCardDetailMutation,
 } from "../../Redux/cards/cards-operations";
 
+const EMPTY_DATE = "1970-01-01T00:00:00.000Z";
 const defaultValue = new Date();
 
 const cardStyle = {
@@ -41,250 +42,390 @@ const iconButtonStyle = {
   backgroundColor: "rgba(0, 0, 0, 0.14)",
 };
 
+// ✅ Кастомный хук для управления датами
+const useDateTimeState = (initialData) => {
+  const [startDate, setStartDate] = useState(defaultValue);
+  const [finishDate, setFinishDate] = useState(defaultValue);
+  const [finishTime, setFinishTime] = useState(defaultValue);
+  const [isStartEnabled, setIsStartEnabled] = useState(false);
+  const [isFinishEnabled, setIsFinishEnabled] = useState(false);
+  const [reminderMinutes, setReminderMinutes] = useState(-10);
+
+  // Утилитарные функции
+  const isEmptyDate = useCallback((date) => {
+    if (!date) return true;
+    return new Date(date).getTime() === new Date(EMPTY_DATE).getTime();
+  }, []);
+
+  const createFinishDateTime = useCallback(() => {
+    const finishDateTime = new Date(finishDate);
+    const timeSource = new Date(finishTime);
+
+    finishDateTime.setHours(
+      timeSource.getHours(),
+      timeSource.getMinutes(),
+      timeSource.getSeconds(),
+      timeSource.getMilliseconds()
+    );
+
+    return finishDateTime;
+  }, [finishDate, finishTime]);
+
+  const getReminderDateTime = useCallback(() => {
+    if (!isFinishEnabled || reminderMinutes === -10) {
+      return EMPTY_DATE;
+    }
+
+    const finishDateTime = createFinishDateTime();
+    const reminderDateTime = sub(finishDateTime, { minutes: reminderMinutes });
+    return reminderDateTime.toISOString();
+  }, [isFinishEnabled, reminderMinutes, createFinishDateTime]);
+
+  // Инициализация данных
+  const initializeFromData = useCallback(
+    (data) => {
+      if (!data) return;
+
+      const { date_time_start, date_time_finish, date_time_reminder } = data;
+
+      const isStartEmpty = isEmptyDate(date_time_start);
+      const isFinishEmpty = isEmptyDate(date_time_finish);
+      const isReminderEmpty = isEmptyDate(date_time_reminder);
+
+      // Устанавливаем даты
+      setStartDate(isStartEmpty ? defaultValue : new Date(date_time_start));
+
+      if (!isFinishEmpty) {
+        const finishDateTime = new Date(date_time_finish);
+        setFinishDate(finishDateTime);
+        setFinishTime(finishDateTime);
+      } else {
+        setFinishDate(defaultValue);
+        setFinishTime(defaultValue);
+      }
+
+      // Устанавливаем флаги
+      setIsStartEnabled(!isStartEmpty);
+      setIsFinishEnabled(!isFinishEmpty);
+
+      // ✅ ИСПРАВЛЕННАЯ логика вычисления напоминания
+      if (!isReminderEmpty && !isFinishEmpty) {
+        const finishDateTime = new Date(date_time_finish);
+        const reminderDateTime = new Date(date_time_reminder);
+        const difference = differenceInMinutes(finishDateTime, reminderDateTime);
+        setReminderMinutes(difference);
+      } else {
+        setReminderMinutes(-10);
+      }
+    },
+    [isEmptyDate]
+  );
+
+  // Вычисляемые значения для календаря
+  const calendarValue = useMemo(() => {
+    if (isStartEnabled && isFinishEnabled) {
+      return [startDate, finishDate];
+    }
+    if (isStartEnabled && !isFinishEnabled) {
+      return startDate;
+    }
+    if (!isStartEnabled && isFinishEnabled) {
+      return finishDate;
+    }
+    return null;
+  }, [isStartEnabled, isFinishEnabled, startDate, finishDate]);
+
+  // Объект для сохранения
+  const getSaveObject = useCallback(() => {
+    const finishDateTime = createFinishDateTime();
+
+    return {
+      date_time_start: isStartEnabled ? startDate.toISOString() : EMPTY_DATE,
+      date_time_finish: isFinishEnabled ? finishDateTime.toISOString() : EMPTY_DATE,
+      date_time_reminder: getReminderDateTime(),
+    };
+  }, [isStartEnabled, isFinishEnabled, startDate, createFinishDateTime, getReminderDateTime]);
+
+  return {
+    // Состояние
+    startDate,
+    finishDate,
+    finishTime,
+    isStartEnabled,
+    isFinishEnabled,
+    reminderMinutes,
+    calendarValue,
+
+    // Сеттеры
+    setStartDate,
+    setFinishDate,
+    setFinishTime,
+    setIsStartEnabled,
+    setIsFinishEnabled,
+    setReminderMinutes,
+
+    // Утилиты
+    initializeFromData,
+    getSaveObject,
+    createFinishDateTime,
+    getReminderDateTime,
+  };
+};
+
+// ✅ Кастомный хук для валидации
+const useDateValidation = (startDate, finishDate, isStartEnabled, isFinishEnabled) => {
+  const validationErrors = useMemo(() => {
+    const errors = [];
+
+    if (isStartEnabled && isFinishEnabled) {
+      if (startDate >= finishDate) {
+        errors.push("Дата начала не может быть позже даты завершения");
+      }
+    }
+
+    if (isStartEnabled && !isValid(startDate)) {
+      errors.push("Неверная дата начала");
+    }
+
+    if (isFinishEnabled && !isValid(finishDate)) {
+      errors.push("Неверная дата завершения");
+    }
+
+    return errors;
+  }, [startDate, finishDate, isStartEnabled, isFinishEnabled]);
+
+  const isValidState = validationErrors.length === 0;
+
+  return { validationErrors, isValid: isValidState };
+};
+
 export default function DatesAndTimePallet({ cardId }) {
+  // ✅ Валидация cardId
+  const isValidCardId =
+    cardId &&
+    cardId !== "undefined" &&
+    typeof cardId !== "undefined" &&
+    cardId !== null &&
+    cardId !== undefined;
+
+  console.log("🚀 НОВЫЙ DatesAndTimePallet received cardId:", cardId, "isValid:", isValidCardId);
+
   const dispatch = useDispatch();
   const [cardTimeUpdate] = useUpdateCardDetailMutation();
 
-  // ВСЕ хуки всегда вызываются, независимо от условий
-  const { data: periodData, isLoading, error } = useGetOneCardQuery(cardId);
-  const [startDayValue, setStartDayValue] = useState(defaultValue);
-  const [completitionDayValue, setCompletitiontDayValue] = useState(defaultValue);
-  const [completitionTimeValue, setCompletitiontTimeValue] = useState(defaultValue);
-  const [startDayChecked, setStartDayChecked] = useState(false);
-  const [completitionDayChecked, setCompletitionDayChecked] = useState(false);
-  const [calendarValue, setCalendarValue] = useState();
-  const [bufferCalendarValue, setBufferCalendarValue] = useState([defaultValue, defaultValue]);
-  const [selectValue, setSelectValue] = useState(-10);
-  const [reminder, setReminder] = useState();
+  // ✅ RTK Query с правильным skip
+  const {
+    data: periodData,
+    isLoading,
+    error,
+    refetch,
+  } = useGetOneCardQuery(cardId, {
+    skip: !isValidCardId,
+  });
 
-  // Определяем что показывать
-  const isInvalidCardId = !cardId || cardId === "undefined" || typeof cardId === "undefined";
-  const hasData = periodData && !isLoading && !error && !isInvalidCardId;
-
-  // Безопасная деструктуризация
-  const date_time_start = hasData ? periodData.date_time_start : null;
-  const date_time_finish = hasData ? periodData.date_time_finish : null;
-  const date_time_reminder = hasData ? periodData.date_time_reminder : null;
-
-  // первый рендеринг компонента - только если есть данные
-  useEffect(() => {
-    if (!hasData) return;
-
-    const compareValue = JSON.stringify(new Date("1970-01-01T00:00:00.000Z"));
-    const startDayDefaultCheck = JSON.stringify(new Date(date_time_start));
-    const completitionDefaultCheck = JSON.stringify(new Date(date_time_finish));
-
-    const startDayDefault =
-      startDayDefaultCheck === compareValue ? defaultValue : new Date(date_time_start);
-    const completitionDefault =
-      completitionDefaultCheck === compareValue ? defaultValue : new Date(date_time_finish);
-    const reminderDefault = new Date(date_time_reminder);
-
-    setStartDayValue(startDayDefault);
-    setCompletitiontDayValue(completitionDefault);
-    setCompletitiontTimeValue(completitionDefault);
-    setReminder(reminderDefault);
-
-    const isStartDate = JSON.stringify(startDayDefault) === compareValue;
-    const isCompletition = JSON.stringify(completitionDefault) === compareValue;
-    const isRemind = JSON.stringify(reminderDefault) === compareValue;
-
-    let calendarDefault = [startDayValue, completitionDayValue];
-
-    if (!isStartDate && isCompletition) calendarDefault = startDayDefault;
-    if (!isCompletition && isStartDate) calendarDefault = completitionDefault;
-    if (!isStartDate && !isCompletition) calendarDefault = [startDayDefault, completitionDefault];
-
-    setBufferCalendarValue(calendarDefault);
-
-    let startDayCheckedTmp = false;
-    if (!isStartDate) startDayCheckedTmp = true;
-    setStartDayChecked(startDayCheckedTmp);
-
-    let completitionDayCheckedTmp = false;
-    if (!isCompletition) completitionDayCheckedTmp = true;
-    setCompletitionDayChecked(completitionDayCheckedTmp);
-
-    if (!isRemind) {
-      let difference = differenceInMinutes(completitionDefault, reminderDefault);
-
-      if (isCompletition || isRemind) {
-        difference = -10;
-      }
-      setSelectValue(difference);
-    }
-  }, [hasData, date_time_start, date_time_finish, date_time_reminder]);
-
-  // обновлене календаря (когда меняются статусы checkbox старт и конец - значения берутся из буфера)
-  useEffect(() => {
-    if (!hasData || bufferCalendarValue === undefined) return;
-    const start = bufferCalendarValue[0];
-    const end = bufferCalendarValue[1];
-
-    const startOnly = startDayChecked && !completitionDayChecked;
-    const endOnly = !startDayChecked && completitionDayChecked;
-    const startANDend = startDayChecked && completitionDayChecked;
-
-    if (startANDend) {
-      setCalendarValue([start, end]);
-    }
-    if (startOnly) {
-      setCalendarValue(start);
-    }
-    if (endOnly) {
-      setCalendarValue(end);
-    }
-  }, [hasData, bufferCalendarValue, completitionDayChecked, startDayChecked]);
-
-  // обновление буфера календаря (когда меняются значения в полях даты и времени старт и конец)
-  const getDayHandler = (calendarValue) => {
-    const startOnly = startDayChecked && !completitionDayChecked;
-    const endOnly = !startDayChecked && completitionDayChecked;
-    const startANDend = startDayChecked && completitionDayChecked;
-
-    const newCaleddarBuffer = bufferCalendarValue.map((item, index) => {
-      let newItem = item;
-      if (startANDend) {
-        newItem = calendarValue[index];
-      }
-      if (startOnly & (index === 0)) {
-        newItem = calendarValue;
-      }
-      if (endOnly & (index === 1)) {
-        newItem = calendarValue;
-      }
-
-      return newItem;
-    });
-    setBufferCalendarValue(newCaleddarBuffer);
-    setStartDayValue(newCaleddarBuffer[0]);
-    setCompletitiontDayValue(newCaleddarBuffer[1]);
-  };
-
-  const getStartDayHandler = (startDayValue) => {
-    const newCaleddarBuffer = bufferCalendarValue.map((item, index) => {
-      let newItem = item;
-      if (index === 0) {
-        newItem = startDayValue;
-      }
-      return newItem;
-    });
-    setBufferCalendarValue(newCaleddarBuffer);
-    setStartDayValue(startDayValue);
-  };
-
-  const getCompletitionDayHandler = (completitionDayValue) => {
-    const newCaleddarBuffer = bufferCalendarValue.map((item, index) => {
-      let newItem = item;
-      if (index === 1) {
-        newItem = completitionDayValue;
-      }
-      return newItem;
-    });
-    setBufferCalendarValue(newCaleddarBuffer);
-    setCompletitiontDayValue(completitionDayValue);
-  };
-
-  const getCompletitionTimeHandler = (completitionTimeValue) => {
-    const newCaleddarBuffer = bufferCalendarValue.map((item, index) => {
-      let newItem = item;
-      if (index === 1) {
-        newItem = completitionTimeValue;
-      }
-      return newItem;
-    });
-    setBufferCalendarValue(newCaleddarBuffer);
-
-    setCompletitiontTimeValue(completitionTimeValue);
-  };
-
-  const getstartDayCheckedHandler = (startDayChecked) => {
-    setStartDayChecked(startDayChecked);
-  };
-
-  const getcompletitionDayCheckedHandler = (completitionDayChecked) => {
-    setCompletitionDayChecked(completitionDayChecked);
-  };
-
-  const saveChanges = async () => {
-    const day = formatISO(new Date(completitionDayValue), { representation: "date" });
-    const time = formatISO(new Date(completitionTimeValue), { representation: "time" });
-    const dateTime = `${day}T${time}`;
-
-    const cardObj = {
-      date_time_reminder: "1970-01-01T00:00:00.000Z",
-      date_time_finish: "1970-01-01T00:00:00.000Z",
-      date_time_start: "1970-01-01T00:00:00.000Z",
-    };
-
-    startDayChecked
-      ? (cardObj.date_time_reminder = reminder)
-      : (cardObj.date_time_reminder = "1970-01-01T00:00:00.000Z");
-    completitionDayChecked
-      ? (cardObj.date_time_finish = dateTime)
-      : (cardObj.date_time_finish = "1970-01-01T00:00:00.000Z");
-    startDayChecked
-      ? (cardObj.date_time_start = startDayValue)
-      : (cardObj.date_time_start = "1970-01-01T00:00:00.000Z");
-    try {
-      await cardTimeUpdate({ id: cardId, ...cardObj });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const remove = async () => {
-    const periodObj = {
-      date_time_reminder: "1970-01-01T00:00:00.000Z",
-      date_time_finish: "1970-01-01T00:00:00.000Z",
-      date_time_start: "1970-01-01T00:00:00.000Z",
-    };
-    try {
-      await cardTimeUpdate({ id: cardId, ...periodObj });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const remaindeBefore = useCallback(
-    (value) => {
-      const day = formatISO(new Date(completitionDayValue), { representation: "date" });
-      const time = formatISO(new Date(completitionTimeValue), { representation: "time" });
-      const dateTime = `${day}T${time}`;
-      const remind =
-        value === -10 ? "1970-01-01T00:00:00.000Z" : sub(new Date(dateTime), { minutes: value });
-
-      setReminder(remind);
-    },
-    [completitionDayValue, completitionTimeValue]
+  // ✅ Используем кастомные хуки
+  const dateTimeState = useDateTimeState();
+  const validation = useDateValidation(
+    dateTimeState.startDate,
+    dateTimeState.finishDate,
+    dateTimeState.isStartEnabled,
+    dateTimeState.isFinishEnabled
   );
 
-  // Условный рендеринг в JSX
+  const hasData = periodData && !isLoading && !error && isValidCardId;
+
+  // Инициализация данных
+  useEffect(() => {
+    if (hasData) {
+      dateTimeState.initializeFromData(periodData);
+    }
+  }, [hasData, periodData]);
+
+  // ✅ Эффект для повторного запроса при изменении cardId
+  useEffect(() => {
+    if (isValidCardId && refetch) {
+      refetch();
+    }
+  }, [cardId, isValidCardId, refetch]);
+
+  // ✅ Упрощенные обработчики событий
+  const handleCalendarChange = useCallback(
+    (calendarValue) => {
+      if (dateTimeState.isStartEnabled && dateTimeState.isFinishEnabled) {
+        // Интервал дат
+        if (Array.isArray(calendarValue) && calendarValue.length === 2) {
+          dateTimeState.setStartDate(calendarValue[0]);
+          dateTimeState.setFinishDate(calendarValue[1]);
+        }
+      } else if (dateTimeState.isStartEnabled) {
+        // Только дата начала
+        dateTimeState.setStartDate(calendarValue);
+      } else if (dateTimeState.isFinishEnabled) {
+        // Только дата завершения
+        dateTimeState.setFinishDate(calendarValue);
+      }
+    },
+    [dateTimeState]
+  );
+
+  const handleReminderChange = useCallback(
+    (minutes) => {
+      if (!dateTimeState.isFinishEnabled) {
+        console.log("⚠️ Дата завершения не установлена, напоминание недоступно");
+        return;
+      }
+
+      dateTimeState.setReminderMinutes(minutes);
+      console.log(
+        "✅ Установлено напоминание:",
+        minutes === -10 ? "без напоминания" : `за ${minutes} минут`
+      );
+    },
+    [dateTimeState]
+  );
+
+  const handleSave = async () => {
+    if (!validation.isValid) {
+      console.error("❌ Ошибки валидации:", validation.validationErrors);
+      return;
+    }
+
+    if (!isValidCardId) {
+      console.error("❌ Невалидный cardId:", cardId);
+      return;
+    }
+
+    const saveObject = dateTimeState.getSaveObject();
+
+    console.log("✅ Сохраняем объект:", saveObject);
+
+    try {
+      await cardTimeUpdate({ id: cardId, ...saveObject });
+      console.log("✅ Данные успешно сохранены");
+    } catch (error) {
+      console.error("❌ Ошибка сохранения:", error);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!isValidCardId) {
+      console.error("❌ Невалидный cardId:", cardId);
+      return;
+    }
+
+    const emptyObject = {
+      date_time_start: EMPTY_DATE,
+      date_time_finish: EMPTY_DATE,
+      date_time_reminder: EMPTY_DATE,
+    };
+
+    try {
+      await cardTimeUpdate({ id: cardId, ...emptyObject });
+      console.log("✅ Даты успешно очищены");
+    } catch (error) {
+      console.error("❌ Ошибка очистки:", error);
+    }
+  };
+
+  // ✅ Улучшенный условный рендеринг
   const renderContent = () => {
-    if (isInvalidCardId) {
+    if (!isValidCardId) {
       return (
-        <div style={{ padding: "20px", textAlign: "center" }}>Ошибка: Не указан ID карточки</div>
+        <div
+          style={{
+            padding: "20px",
+            textAlign: "center",
+            color: "#c62828",
+            backgroundColor: "#ffebee",
+            borderRadius: "4px",
+          }}
+        >
+          ❌ Ошибка: Не указан корректный ID карточки
+          <div style={{ fontSize: "12px", marginTop: "5px", color: "#666" }}>
+            Получен: {JSON.stringify(cardId)}
+          </div>
+        </div>
       );
     }
 
     if (isLoading) {
       return (
-        <div style={{ padding: "20px", textAlign: "center" }}>Загрузка данных карточки...</div>
+        <div
+          style={{
+            padding: "20px",
+            textAlign: "center",
+            color: "#1976d2",
+          }}
+        >
+          ⏳ Загрузка данных карточки...
+        </div>
       );
     }
 
     if (error) {
       return (
-        <div style={{ padding: "20px", textAlign: "center" }}>
-          Ошибка загрузки карточки: {error.message || "Неизвестная ошибка"}
+        <div
+          style={{
+            padding: "20px",
+            textAlign: "center",
+            color: "#c62828",
+            backgroundColor: "#ffebee",
+            borderRadius: "4px",
+          }}
+        >
+          ❌ Ошибка загрузки карточки
+          <div style={{ fontSize: "12px", marginTop: "5px" }}>
+            {error.message || error.detail || "Неизвестная ошибка"}
+          </div>
+          <button
+            onClick={() => refetch()}
+            style={{
+              marginTop: "10px",
+              padding: "5px 10px",
+              fontSize: "12px",
+              border: "1px solid #c62828",
+              background: "transparent",
+              color: "#c62828",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            Повторить
+          </button>
         </div>
       );
     }
 
     if (!periodData) {
-      return <div style={{ padding: "20px", textAlign: "center" }}>Нет данных карточки...</div>;
+      return (
+        <div
+          style={{
+            padding: "20px",
+            textAlign: "center",
+            color: "#666",
+          }}
+        >
+          ℹ️ Нет данных карточки...
+          <button
+            onClick={() => refetch()}
+            style={{
+              marginTop: "10px",
+              padding: "5px 10px",
+              fontSize: "12px",
+              border: "1px solid #666",
+              background: "transparent",
+              color: "#666",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            Обновить
+          </button>
+        </div>
+      );
     }
 
+    // Нормальный рендеринг компонента
     return (
       <>
         <CardHeader
@@ -304,31 +445,57 @@ export default function DatesAndTimePallet({ cardId }) {
             </IconButton>
           }
         />
+
+        {/* Показываем ошибки валидации */}
+        {validation.validationErrors.length > 0 && (
+          <div
+            style={{
+              padding: "10px",
+              marginBottom: "10px",
+              backgroundColor: "#ffebee",
+              borderRadius: "4px",
+              color: "#c62828",
+            }}
+          >
+            {validation.validationErrors.map((error, index) => (
+              <div key={index}>⚠️ {error}</div>
+            ))}
+          </div>
+        )}
+
         <Dates
-          getDayHandler={getDayHandler}
-          calendarValue={calendarValue}
-          startDayChecked={startDayChecked}
-          completitionDayChecked={completitionDayChecked}
+          getDayHandler={handleCalendarChange}
+          calendarValue={dateTimeState.calendarValue}
+          startDayChecked={dateTimeState.isStartEnabled}
+          completitionDayChecked={dateTimeState.isFinishEnabled}
         />
+
         <Period
-          startDayValue={startDayValue}
-          completitionDayValue={completitionDayValue}
-          completitionTimeValue={completitionTimeValue}
-          getStartDayHandler={getStartDayHandler}
-          getCompletitionDayHandler={getCompletitionDayHandler}
-          getCompletitionTimeHandler={getCompletitionTimeHandler}
-          getstartDayCheckedHandler={getstartDayCheckedHandler}
-          getcompletitionDayCheckedHandler={getcompletitionDayCheckedHandler}
-          startDayChecked={startDayChecked}
-          completitionDayChecked={completitionDayChecked}
+          cardId={cardId}
+          startDayValue={dateTimeState.startDate}
+          completitionDayValue={dateTimeState.finishDate}
+          completitionTimeValue={dateTimeState.finishTime}
+          getStartDayHandler={dateTimeState.setStartDate}
+          getCompletitionDayHandler={dateTimeState.setFinishDate}
+          getCompletitionTimeHandler={dateTimeState.setFinishTime}
+          getstartDayCheckedHandler={dateTimeState.setIsStartEnabled}
+          getcompletitionDayCheckedHandler={dateTimeState.setIsFinishEnabled}
+          startDayChecked={dateTimeState.isStartEnabled}
+          completitionDayChecked={dateTimeState.isFinishEnabled}
           defaultValue={defaultValue}
         />
-        <Remainder defaultValue={selectValue} remaindeBefore={remaindeBefore} />
+
+        <Remainder
+          defaultValue={dateTimeState.reminderMinutes}
+          remaindeBefore={handleReminderChange}
+        />
+
         <DateAndTimeButtonsGroup
-          startDayChecked={startDayChecked}
-          completitionDayChecked={completitionDayChecked}
-          saveChanges={saveChanges}
-          remove={remove}
+          startDayChecked={dateTimeState.isStartEnabled}
+          completitionDayChecked={dateTimeState.isFinishEnabled}
+          saveChanges={handleSave}
+          remove={handleRemove}
+          disabled={!validation.isValid}
         />
       </>
     );

@@ -298,13 +298,13 @@ function TaskCard({
           </IconButton>
         </DialogTitle>
         <DialogContent sx={style.dialogContent}>
-          {
-            <EditButtonsGroup
-              chipsArr={chipsArr}
-              cardId={id}
-              p={{ date_time_finish, date_time_start, status }}
-            />
-          }
+          <EditButtonsGroup
+            chipsArr={chipsArr}
+            cardId={id}
+            date_time_finish={date_time_finish}
+            date_time_start={date_time_start}
+            status={status}
+          />
         </DialogContent>
       </Dialog>
       {closestEdge && <DropIndicator height={placeholderHeight} />}

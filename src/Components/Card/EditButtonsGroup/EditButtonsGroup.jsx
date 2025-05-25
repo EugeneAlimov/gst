@@ -28,24 +28,43 @@ const buttonStyle = {
   },
 };
 
-export default function EditButtonsGroup({ cardId, chipsArr }) {
+// ✅ ИСПРАВЛЕНИЕ: Переименовываем параметр для избежания конфликта имен
+export default function EditButtonsGroup({ cardId: originalCardId, chipsArr, ...cardData }) {
   const dispatch = useDispatch();
   const popUpTypeFromState = useSelector(chipData);
   const popUpType = popUpTypeFromState.popUpType;
 
+  // ✅ ИСПРАВЛЕНИЕ: Сохраняем оригинальный cardId в состоянии
+  const [currentCardId] = useState(originalCardId);
+
+  // ✅ Валидация cardId
+  const isValidCardId =
+    currentCardId &&
+    currentCardId !== "undefined" &&
+    typeof currentCardId !== "undefined" &&
+    currentCardId !== null;
+
+  console.log("EditButtonsGroup received cardId:", currentCardId, "isValid:", isValidCardId);
+
   // Состояния для принудительного обновления
-  const [cardData, setCardData] = useState(null);
+  const [cardDataState, setCardDataState] = useState(null);
   const [allChips, setAllChips] = useState(chipsArr || []);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Функция для загрузки данных карточки
   const fetchCardData = useCallback(async () => {
+    if (!isValidCardId) {
+      console.error("EditButtonsGroup: Invalid cardId, skipping fetch");
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/card/${cardId}/`,
+        `${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/api/v1/card/${currentCardId}/`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
@@ -56,20 +75,22 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
 
       if (response.ok) {
         const data = await response.json();
-        setCardData(data);
+        setCardDataState(data);
       } else {
+        console.error("Failed to fetch card data:", response.status);
       }
     } catch (error) {
+      console.error("Network error fetching card data:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [cardId]);
+  }, [currentCardId, isValidCardId]);
 
   // Функция для загрузки всех чипов
   const fetchAllChips = useCallback(async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/v1/chip/`,
+        `${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/api/v1/chip/`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
@@ -82,8 +103,11 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
         const chips = await response.json();
         setAllChips(chips);
       } else {
+        console.error("Failed to fetch chips");
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("Network error fetching chips:", error);
+    }
   }, []);
 
   // Обновляем изначальные чипы при изменении chipsArr
@@ -93,8 +117,10 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
 
   // Загружаем данные при монтировании и при изменении refreshTrigger
   useEffect(() => {
-    Promise.all([fetchCardData(), fetchAllChips()]);
-  }, [fetchCardData, fetchAllChips, refreshTrigger]);
+    if (isValidCardId) {
+      Promise.all([fetchCardData(), fetchAllChips()]);
+    }
+  }, [fetchCardData, fetchAllChips, refreshTrigger, isValidCardId]);
 
   // Функция для принудительного обновления
   const forceRefresh = useCallback(() => {
@@ -103,49 +129,95 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
 
   // Обновляем при возврате к главному меню
   useEffect(() => {
-    if (popUpType === 0) {
-      // Добавляем небольшую задержку для гарантии обновления
+    if (popUpType === 0 && isValidCardId) {
       setTimeout(() => {
         forceRefresh();
-        // Дополнительно инвалидируем кэш карточек
-        dispatch(cardsApi.util.invalidateTags([{ type: "cards", id: cardId }]));
+        dispatch(cardsApi.util.invalidateTags([{ type: "cards", id: currentCardId }]));
       }, 100);
     }
-  }, [popUpType, forceRefresh, dispatch, cardId]);
+  }, [popUpType, forceRefresh, dispatch, currentCardId, isValidCardId]);
 
-  useEffect(() => {}, [allChips]);
-
-  // Функция для рендеринга попапов
+  // ✅ ИСПРАВЛЕНИЕ: Функция для рендеринга попапов с гарантированной передачей cardId
   const renderPopup = () => {
+    if (!isValidCardId) {
+      return (
+        <Box
+          sx={{
+            padding: "20px",
+            textAlign: "center",
+            color: "#c62828",
+            backgroundColor: "#ffebee",
+            borderRadius: "4px",
+          }}
+        >
+          ❌ Ошибка: Некорректный ID карточки
+          <div style={{ fontSize: "12px", marginTop: "5px", color: "#666" }}>
+            Получен: {JSON.stringify(currentCardId)}
+          </div>
+        </Box>
+      );
+    }
+
+    // ✅ ИСПРАВЛЕНИЕ: Явно передаем currentCardId во все компоненты
+    console.log(`Rendering popup type ${popUpType} with cardId:`, currentCardId);
+
     switch (popUpType) {
       case 10:
-        return <AllSettingsOfCard chipsArr={allChips} cardId={cardId} {...cardData} />;
+        return <AllSettingsOfCard chipsArr={allChips} cardId={currentCardId} {...cardDataState} />;
       case 1:
         return (
           <ChangeChipsPallet
-            cardId={cardId}
-            chipsArr={allChips} // Используем обновленные чипы
+            cardId={currentCardId}
+            chipsArr={allChips}
             onChipsUpdate={forceRefresh}
           />
         );
       case 2:
-        return <ChangeUsers cardId={cardId} />;
+        return <ChangeUsers cardId={currentCardId} />;
       case 3:
-        return <CreateNewChip id={cardId} onChipCreated={forceRefresh} />;
+        return <CreateNewChip id={currentCardId} onChipCreated={forceRefresh} />;
       case 4:
-        return <DatesAndTimePallet cardId={cardId} />;
+        // ✅ ИСПРАВЛЕНИЕ: Убеждаемся что cardId передается корректно
+        console.log(
+          "Opening DatesAndTimePallet with cardId:",
+          currentCardId,
+          "type:",
+          typeof currentCardId
+        );
+        return <DatesAndTimePallet cardId={currentCardId} />;
       default:
         return null;
     }
   };
 
-  if (isLoading && !cardData) {
+  if (!isValidCardId) {
     return (
       <Box sx={{ display: "flex", flexDirection: "row", margin: "10px" }}>
-        <Box sx={{ margin: "10px", padding: "20px" }}>Загрузка...</Box>
+        <Box
+          sx={{
+            margin: "10px",
+            padding: "20px",
+            color: "#c62828",
+            backgroundColor: "#ffebee",
+            borderRadius: "4px",
+          }}
+        >
+          ❌ Ошибка: Некорректный ID карточки
+        </Box>
       </Box>
     );
   }
+
+  if (isLoading && !cardDataState) {
+    return (
+      <Box sx={{ display: "flex", flexDirection: "row", margin: "10px" }}>
+        <Box sx={{ margin: "10px", padding: "20px", color: "#1976d2" }}>⏳ Загрузка...</Box>
+      </Box>
+    );
+  }
+
+  // Используем либо загруженные данные, либо переданные пропсы
+  const currentCardData = cardDataState || cardData;
 
   return (
     <Box
@@ -158,12 +230,12 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
       }}
     >
       {/* Превью карточки с обновленными чипами */}
-      {cardData && popUpType !== 10 && (
+      {currentCardData && popUpType !== 10 && (
         <TaskCard
-          {...cardData}
-          allChips={allChips} // Передаем обновленные чипы
+          {...currentCardData}
+          allChips={allChips}
           inPopup={true}
-          key={`card-preview-${cardId}-${refreshTrigger}-${allChips.length}`} // Ключ зависит и от чипов
+          key={`card-preview-${currentCardId}-${refreshTrigger}-${allChips.length}`}
         />
       )}
 
@@ -205,7 +277,15 @@ export default function EditButtonsGroup({ cardId, chipsArr }) {
               color="secondary"
               size="large"
               sx={buttonStyle}
-              onClick={() => dispatch(popUpToOpen(4))}
+              onClick={() => {
+                console.log(
+                  "Opening dates popup for cardId:",
+                  currentCardId,
+                  "type:",
+                  typeof currentCardId
+                );
+                dispatch(popUpToOpen(4));
+              }}
             >
               Изменить даты
             </Button>
