@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
+from .utils.reminder_utils import calculate_reminder_time, validate_reminder_offset
 
 # Валидатор для HEX-цветов
 hex_color_validator = RegexValidator(
@@ -359,6 +361,14 @@ class Card(models.Model):
     created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')  # Сохраняем названия
     updated = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')  # Сохраняем названия
     # Дополнительные поля, которые могут быть полезны
+    date_time_start = models.DateTimeField(null=True, blank=True, verbose_name='Дата и время начала')
+    date_time_finish = models.DateTimeField(null=True, blank=True, verbose_name='Дата и время завершения')
+    reminder_offset_minutes = models.IntegerField(null=True, blank=True, verbose_name='Смещение напоминания (минуты)',
+                                                  help_text='За сколько минут до завершения отправить напоминание')
+    reminder_calculated_time = models.DateTimeField(null=True, blank=True,
+                                                    verbose_name='Вычисленное время напоминания (UTC)',
+                                                    help_text='Автоматически рассчитывается на основе времени завершения и смещения'
+                                                    )
     due_date = models.DateTimeField(null=True, blank=True, verbose_name='Срок выполнения')
     reminder_date = models.DateTimeField(null=True, blank=True, verbose_name='Напоминание')
     priority = models.IntegerField(choices=[(1, 'Низкий'), (2, 'Средний'), (3, 'Высокий'), (4, 'Критический')],
@@ -374,6 +384,139 @@ class Card(models.Model):
 
     def __str__(self):
         return self.name
+
+    def recalculate_reminder_time(self):
+        """
+        Автоматический пересчет времени напоминания при изменении дат
+        Вызывается при изменении date_time_finish или reminder_offset_minutes
+        """
+        try:
+            # Если есть время завершения и смещение - рассчитываем время напоминания
+            if self.date_time_finish and self.reminder_offset_minutes:
+                self.reminder_calculated_time = calculate_reminder_time(
+                    self.date_time_finish,
+                    self.reminder_offset_minutes
+                )
+            else:
+                # Если нет данных для расчета - обнуляем
+                self.reminder_calculated_time = None
+
+        except ValidationError as e:
+            # В случае ошибки валидации - обнуляем напоминание
+            self.reminder_calculated_time = None
+            self.reminder_offset_minutes = None
+            raise e
+
+    def validate_reminder_data(self):
+        """
+        Валидация данных напоминания перед сохранением
+        """
+        if self.reminder_offset_minutes and self.date_time_finish:
+            validate_reminder_offset(self.date_time_finish, self.reminder_offset_minutes)
+
+    def save(self, *args, **kwargs):
+        """
+        Переопределяем save для автоматического пересчета времени напоминания
+        """
+
+        print(f"🔍 CARD MODEL DEBUG: Сохранение карточки {self.id}")
+        print(f"- date_time_start: {self.date_time_start}")
+        print(f"- date_time_finish: {self.date_time_finish}")
+        print(f"- reminder_offset_minutes: {self.reminder_offset_minutes}")
+        print(f"- is_completed: {self.is_completed}")
+
+        # АВТОМАТИЧЕСКОЕ ОТКЛЮЧЕНИЕ при выполнении задачи
+        if self.is_completed and (self.reminder_offset_minutes or self.reminder_calculated_time):
+            print(f"DEBUG: Отключаем напоминание для карточки {self.id}")  # для отладки
+
+            # Отключаем напоминание
+            self.reminder_offset_minutes = None
+            self.reminder_calculated_time = None
+
+        elif not self.is_completed:
+            # Валидируем и пересчитываем только если задача НЕ выполнена
+            try:
+                print("DEBUG: Валидируем данные напоминания")
+                self.validate_reminder_data()
+                print("DEBUG: Пересчитываем время напоминания")
+                self.recalculate_reminder_time()
+                print(f"DEBUG: После пересчета reminder_calculated_time: {self.reminder_calculated_time}")
+            except ValidationError:
+                # Если валидация не прошла - обнуляем
+                self.reminder_offset_minutes = None
+                self.reminder_calculated_time = None
+                print(f"DEBUG: Ошибка валидации: {e}")
+
+        print(f"DEBUG: Перед super().save():")
+        print(f"- date_time_start: {self.date_time_start}")
+        print(f"- date_time_finish: {self.date_time_finish}")
+        print(f"- reminder_offset_minutes: {self.reminder_offset_minutes}")
+        print(f"- reminder_calculated_time: {self.reminder_calculated_time}")
+
+        # Вызываем родительский save
+        super().save(*args, **kwargs)
+
+        print(f"DEBUG: После super().save() - карточка сохранена")
+
+    def disable_reminder(self, reason="manually_disabled"):
+        """
+        Отключает напоминание для карточки
+
+        Args:
+            reason (str): Причина отключения для логирования
+        """
+        old_offset = self.reminder_offset_minutes
+        old_calculated = self.reminder_calculated_time
+
+        self.reminder_offset_minutes = None
+        self.reminder_calculated_time = None
+
+        # Логируем отключение напоминания
+        if hasattr(self, '_current_user'):  # если передан пользователь
+            from .models import ReminderLog
+            ReminderLog.log_reminder_change(
+                card=self,
+                user=self._current_user,
+                action='disabled',
+                old_offset_minutes=old_offset,
+                old_calculated_time=old_calculated,
+                metadata={'reason': reason}
+            )
+
+        self.save()
+
+    def get_reminder_status(self):
+        """
+        Возвращает статус напоминания для отображения
+        """
+        if not self.reminder_offset_minutes:
+            return "Напоминание отключено"
+
+        if not self.reminder_calculated_time:
+            return "Ошибка расчета времени"
+
+        from django.utils import timezone
+        from .utils.reminder_utils import get_reminder_display_text
+
+        now = timezone.now()
+
+        if self.reminder_calculated_time <= now:
+            return "Время напоминания наступило"
+        else:
+            offset_text = get_reminder_display_text(self.reminder_offset_minutes)
+            return f"Напоминание {offset_text} до завершения"
+
+    @property
+    def is_reminder_active(self):
+        """
+        Проверяет активно ли напоминание
+        """
+        return (
+                self.reminder_offset_minutes is not None and
+                self.reminder_calculated_time is not None and
+                not self.is_completed and  # предполагается что есть поле is_completed
+                not self.is_archived  # предполагается что есть поле is_archived
+        )
 
 
 class CardInColumn(models.Model):

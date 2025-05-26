@@ -364,9 +364,9 @@ class CardAdmin(admin.ModelAdmin):
         'is_completed', 'is_archived', 'created', 'updated', 'priority',
         ('board', admin.RelatedOnlyFieldListFilter),
         ('assigned_users', admin.RelatedOnlyFieldListFilter),
-        'is_subscribed'
+        'is_subscribed',
         # Фильтр для reminder_offset_minutes добавим после создания поля
-        # ('reminder_offset_minutes', admin.BooleanFieldListFilter),
+        ('reminder_offset_minutes', admin.BooleanFieldListFilter),
     )
 
     # Поиск
@@ -387,7 +387,7 @@ class CardAdmin(admin.ModelAdmin):
     # Поля только для чтения
     readonly_fields = (
         'created', 'updated', 'reminder_logs_count', 'last_reminder_action',
-        'reminder_effectiveness'
+        'reminder_effectiveness', 'reminder_calculated_time'
     )
 
     # Группировка полей в форме редактирования
@@ -406,9 +406,9 @@ class CardAdmin(admin.ModelAdmin):
         }),
         ('Даты и сроки', {
             'fields': (
-                'due_date', 'reminder_date'
+                # 'due_date', 'reminder_date'
                 # После миграции заменим на:
-                # 'date_time_start', 'date_time_finish', 'reminder_offset_minutes'
+                'date_time_start', 'date_time_finish', 'reminder_offset_minutes'
             ),
             'classes': ('collapse',)
         }),
@@ -434,7 +434,7 @@ class CardAdmin(admin.ModelAdmin):
         else:
             # Временная проверка старого поля reminder_date
             reminder_offset = None
-            if hasattr(obj, 'reminder_date') and obj.reminder_date:
+            if hasattr(obj, 'reminder_offset_minutes') and obj.reminder_offset_minutes:
                 reminder_offset = "установлено"  # Временное отображение
 
         if reminder_offset and reminder_offset != "установлено":

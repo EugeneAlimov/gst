@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from .utils.reminder_utils import validate_reminder_offset
 from .models import *
 
 
@@ -38,45 +39,72 @@ class CardInColumnSerializer(serializers.ModelSerializer):
 
 
 class CardSerializer(serializers.ModelSerializer):
-    column_id = serializers.SerializerMethodField()  # Получаем column_id через метод
-    position_in_column = serializers.SerializerMethodField()  # Получаем position_in_column через метод
-    card_in_columns = CardInColumnSerializer(many=True, read_only=True, required=False)
-    # Объявляем поля, которые могут быть null или могут отсутствовать
+    # Существующие поля...
     date_time_start = serializers.DateTimeField(required=False, allow_null=True)
     date_time_finish = serializers.DateTimeField(required=False, allow_null=True)
-    date_time_reminder = serializers.DateTimeField(required=False, allow_null=True)
-    created = serializers.DateTimeField(required=False, read_only=True)  # Поле только для чтения
-    updated = serializers.DateTimeField(required=False, read_only=True)  # Поле только для чтения
-    header_image = serializers.ImageField(required=False, allow_null=True)
+    reminder_offset_minutes = serializers.IntegerField(required=False, allow_null=True)
+    reminder_calculated_time = serializers.DateTimeField(read_only=True)
+
+    # Поля для создания карточки
+    column_id = serializers.IntegerField(write_only=True, required=False)
+    position_in_column = serializers.IntegerField(write_only=True, required=False)
+
+    # Дополнительные поля для фронтенда
+    reminder_status = serializers.SerializerMethodField()
+    is_reminder_active = serializers.SerializerMethodField()
 
     class Meta:
         model = Card
+        # КРИТИЧНО: убедитесь что новые поля включены!
         fields = '__all__'
+        # ИЛИ явно перечислите:
+        # fields = [
+        #     'id', 'name', 'description', 'board', 'created', 'updated',
+        #     'date_time_start', 'date_time_finish',  # <- ЭТИ ПОЛЯ
+        #     'reminder_offset_minutes', 'reminder_calculated_time',  # <- И ЭТИ
+        #     'reminder_status', 'is_reminder_active',
+        #     # ... остальные поля
+        # ]
 
-    def validate(self, data):
-        """Валидация данных карточки"""
-        # Проверяем, что date_time_finish позже чем date_time_start если оба указаны
-        if 'date_time_start' in data and 'date_time_finish' in data:
-            if data['date_time_start'] and data['date_time_finish']:
-                if data['date_time_finish'] < data['date_time_start']:
-                    raise serializers.ValidationError(
-                        "Дата завершения не может быть раньше даты начала"
-                    )
-        return data
+    # ДОБАВЬТЕ ОТЛАДКУ в update метод:
+    def update(self, instance, validated_data):
+        print(f"🔍 SERIALIZER DEBUG: Получены данные для обновления:")
+        print(f"- validated_data: {validated_data}")
+        print(f"- instance.id: {instance.id}")
 
-    def get_column_id(self, obj):
-        # Предполагаем, что карточка может быть привязана к одной колонке
-        card_in_column = obj.card_in_columns.first()  # Берем первую колонку
-        if card_in_column:
-            return card_in_column.column.id  # Возвращаем ID колонки
-        return None
+        # Проверяем какие поля пришли
+        if 'date_time_start' in validated_data:
+            print(f"✅ date_time_start: {validated_data['date_time_start']}")
+        if 'date_time_finish' in validated_data:
+            print(f"✅ date_time_finish: {validated_data['date_time_finish']}")
+        if 'reminder_offset_minutes' in validated_data:
+            print(f"✅ reminder_offset_minutes: {validated_data['reminder_offset_minutes']}")
 
-    def get_position_in_column(self, obj):
-        # Предполагаем, что карточка может быть привязана к одной колонке
-        card_in_column = obj.card_in_columns.first()
-        if card_in_column:
-            return card_in_column.position_in_column  # Возвращаем позицию карточки в колонке
-        return None
+        # Сохраняем старые значения для логирования
+        old_offset = instance.reminder_offset_minutes
+        old_calculated = instance.reminder_calculated_time
+
+        # АВТОМАТИЧЕСКОЕ ОТКЛЮЧЕНИЕ при выполнении
+        if validated_data.get('is_completed', False):
+            if instance.reminder_offset_minutes or instance.reminder_calculated_time:
+                print(f"SERIALIZER DEBUG: Отключаем напоминание для карточки {instance.id}")
+                validated_data['reminder_offset_minutes'] = None
+                validated_data['reminder_calculated_time'] = None
+
+        # Передаем текущего пользователя в модель для логирования
+        if 'request' in self.context:
+            instance._current_user = self.context['request'].user
+
+        # Обновляем инстанс
+        result = super().update(instance, validated_data)
+
+        print(f"🔍 SERIALIZER DEBUG: После обновления:")
+        print(f"- result.date_time_start: {result.date_time_start}")
+        print(f"- result.date_time_finish: {result.date_time_finish}")
+        print(f"- result.reminder_offset_minutes: {result.reminder_offset_minutes}")
+        print(f"- result.reminder_calculated_time: {result.reminder_calculated_time}")
+
+        return result
 
 
 class ColumnSerializer(serializers.ModelSerializer):
