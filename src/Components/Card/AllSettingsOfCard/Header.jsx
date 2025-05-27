@@ -22,14 +22,18 @@ import { useSelector } from "react-redux";
 export default function Header({ text, column_id }) {
   const columnsList = useSelector((state) => state.columnsApi.queries["getColumns(1)"]?.data);
 
-  const [textAreaText, setTextAreaText] = useState(text);
+  const [textAreaText, setTextAreaText] = useState(text || "");
   const [inColumn, setInColumn] = useState({});
   const [anchorInColumn, setAnchorInColumn] = useState(null);
 
   useEffect(() => {
+    if (!columnsList || !Array.isArray(columnsList) || !column_id) {
+      return;
+    }
+
     const col = columnsList.find((el) => el.id === column_id);
     setInColumn(col);
-  }, [columnsList, columnsList]);
+  }, [columnsList, column_id]);
 
   const handleOpenInColumnMenu = (event) => {
     setAnchorElUser(event.currentTarget);
@@ -57,7 +61,7 @@ export default function Header({ text, column_id }) {
       <Typography sx={Style.typographyOnTheColumn}>
         {"В колонке: "}
         <Link href="#" sx={Style.linkOnTheColumn}>
-          {inColumn.name}
+          {inColumn?.name || "Загрузка..."}
         </Link>
         <Menu
           sx={{ mt: "45px" }}

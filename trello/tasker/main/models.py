@@ -83,7 +83,7 @@ class Board(models.Model):
         ordering = ['-updated']
 
     def __str__(self):
-        return self.name
+        return self.name or f"Доска #{self.id}"
 
 
 class BoardMembership(models.Model):
@@ -383,7 +383,7 @@ class Card(models.Model):
         ordering = ['created']
 
     def __str__(self):
-        return self.name
+        return self.name or f"Колонка #{self.id}"
 
     def recalculate_reminder_time(self):
         """

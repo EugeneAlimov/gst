@@ -72,6 +72,17 @@ CORS_ORIGIN_ALLOW_ALL = True
 
 ROOT_URLCONF = 'tasker.urls'
 
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Для тестирования
+DEFAULT_FROM_EMAIL = 'noreply@yourcompany.com'
+
+# Для production замените на:
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'your-email@gmail.com'
+# EMAIL_HOST_PASSWORD = 'your-password'
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

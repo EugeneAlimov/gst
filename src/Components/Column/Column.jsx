@@ -61,7 +61,14 @@ import {
   handleBlur,
 } from "../../libs/libs";
 
-export default function Column({ columnName, columnId, columnIndex, boardHeight, activeBoardId, allChips }) {
+export default function Column({
+  columnName,
+  columnId,
+  columnIndex,
+  boardHeight,
+  activeBoardId,
+  allChips,
+}) {
   const { data: CARDS } = useGetCardsQuery(columnId);
 
   const [cardPositionUpdate] = useUpdateCardInColumnMutation();
@@ -96,13 +103,19 @@ export default function Column({ columnName, columnId, columnIndex, boardHeight,
   };
 
   useEffect(() => {
-    if (CARDS) {
+    if (CARDS && Array.isArray(CARDS)) {
       const newCards = Array.from(CARDS);
+
+      // Правильная сортировка
       newCards.sort((a, b) => {
-        a.card_in_columns[0].position_in_column > b.card_in_columns[0].position_in_column ? 1 : -1;
+        const posA = a.card_in_columns?.[0]?.position_in_column || 0;
+        const posB = b.card_in_columns?.[0]?.position_in_column || 0;
+        return posA - posB;
       });
-      
+
       setCards(newCards);
+    } else {
+      setCards([]);
     }
   }, [CARDS]);
 

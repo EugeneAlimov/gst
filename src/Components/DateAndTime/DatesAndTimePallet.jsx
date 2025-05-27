@@ -62,38 +62,35 @@ const useDateTimeState = () => {
   }, []);
 
   // Инициализация данных
-  const initializeFromData = useCallback(
-    (data) => {
-      if (!data) return;
+  const initializeFromData = useCallback((data) => {
+    if (!data) return;
 
-      const { date_time_start, date_time_finish, reminder_offset_minutes } = data;
+    const { date_time_start, date_time_finish, reminder_offset_minutes } = data;
 
-      const isStartEmpty = isEmptyDate(date_time_start);
-      const isFinishEmpty = isEmptyDate(date_time_finish);
+    const isStartEmpty = isEmptyDate(date_time_start);
+    const isFinishEmpty = isEmptyDate(date_time_finish);
 
-      // Устанавливаем даты
-      const parsedStartDate = isStartEmpty ? defaultValue : new Date(date_time_start);
-      setStartDate(parsedStartDate);
+    // Устанавливаем даты
+    const parsedStartDate = isStartEmpty ? defaultValue : new Date(date_time_start);
+    setStartDate(parsedStartDate);
 
-      if (!isFinishEmpty) {
-        const finishDateTime = new Date(date_time_finish);
-        setFinishDate(finishDateTime);
-        setFinishTime(finishDateTime);
-      } else {
-        setFinishDate(defaultValue);
-        setFinishTime(defaultValue);
-      }
+    if (!isFinishEmpty) {
+      const finishDateTime = new Date(date_time_finish);
+      setFinishDate(finishDateTime);
+      setFinishTime(finishDateTime);
+    } else {
+      setFinishDate(defaultValue);
+      setFinishTime(defaultValue);
+    }
 
-      // Устанавливаем флаги
-      setIsStartEnabled(!isStartEmpty);
-      setIsFinishEnabled(!isFinishEmpty);
+    // Устанавливаем флаги
+    setIsStartEnabled(!isStartEmpty);
+    setIsFinishEnabled(!isFinishEmpty);
 
-      // Устанавливаем смещение напоминания
-      const offsetMinutes = reminder_offset_minutes || -10;
-      setReminderOffsetMinutes(offsetMinutes);
-    },
-    [isEmptyDate]
-  );
+    // Устанавливаем смещение напоминания
+    const offsetMinutes = reminder_offset_minutes || -10;
+    setReminderOffsetMinutes(offsetMinutes);
+  }, [isEmptyDate]);
 
   // УПРОЩЕННЫЙ объект для сохранения (БЕЗ клиентского расчета времени)
   const getSaveObject = useCallback(() => {
@@ -159,11 +156,11 @@ const useDateTimeState = () => {
 
 // Кастомный хук для валидации
 const useDateValidation = (
-  startDate,
-  finishDate,
-  isStartEnabled,
-  isFinishEnabled,
-  originalStartDate,
+  startDate, 
+  finishDate, 
+  isStartEnabled, 
+  isFinishEnabled, 
+  originalStartDate, 
   originalEndDate
 ) => {
   const validationErrors = useMemo(() => {
@@ -183,15 +180,15 @@ const useDateValidation = (
 
     // Валидация дат на прошедшее время
     const now = new Date();
-
+    
     if (isStartEnabled && startDate) {
       if (!isOriginalDate(startDate, originalStartDate)) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-
+        
         const startOfDayDate = new Date(startDate);
         startOfDayDate.setHours(0, 0, 0, 0);
-
+        
         if (startOfDayDate < today) {
           errors.push("Дата начала не может быть в прошлом");
         }
@@ -202,10 +199,10 @@ const useDateValidation = (
       if (!isOriginalDate(finishDate, originalEndDate)) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-
+        
         const finishDay = new Date(finishDate);
         finishDay.setHours(0, 0, 0, 0);
-
+        
         if (finishDay < today) {
           errors.push("Дата завершения не может быть в прошлом");
         }
@@ -246,25 +243,25 @@ export default function DatesAndTimePallet({ cardId }) {
   const [cardTimeUpdate] = useUpdateCardDetailMutation();
 
   // RTK Query с правильным skip
-  const {
-    data: periodData,
-    isLoading,
-    error,
-    refetch,
-  } = useGetOneCardQuery(cardId, {
-    skip: !isValidCardId,
-    refetchOnMountOrArgChange: true, //принудительное обновление при изменении cardId
-  });
+const {
+  data: periodData,
+  isLoading,
+  error,
+  refetch,
+} = useGetOneCardQuery(cardId, {
+  skip: !isValidCardId,
+  refetchOnMountOrArgChange: true, //принудительное обновление при изменении cardId
+});
 
   // Используем кастомные хуки
   const dateTimeState = useDateTimeState();
   const validation = useDateValidation(
-    dateTimeState.startDate,
-    dateTimeState.finishDate,
-    dateTimeState.isStartEnabled,
-    dateTimeState.isFinishEnabled,
-    periodData?.date_time_start,
-    periodData?.date_time_finish
+  dateTimeState.startDate,
+  dateTimeState.finishDate,
+  dateTimeState.isStartEnabled,
+  dateTimeState.isFinishEnabled,
+  periodData?.date_time_start,
+  periodData?.date_time_finish
   );
 
   const hasData = periodData && !isLoading && !error && isValidCardId;
@@ -344,82 +341,81 @@ export default function DatesAndTimePallet({ cardId }) {
 
   // НОВЫЙ: Обработчик автоматического отключения напоминаний
   const handleReminderDisabled = useCallback((reason, previousValue) => {
-    console.log(
-      `🔕 Напоминание автоматически отключено. Причина: ${reason}, было: ${previousValue}`
-    );
-
+    console.log(`🔕 Напоминание автоматически отключено. Причина: ${reason}, было: ${previousValue}`);
+    
     // Здесь можно добавить дополнительную логику, например:
     // - Показать уведомление пользователю
     // - Сохранить в истории изменений
     // - Отправить аналитику
   }, []);
 
-  const handleSave = useCallback(async () => {
-    if (!validation.isValid) {
-      console.error("❌ Ошибки валидации:", validation.validationErrors);
-      alert(`❌ Ошибки валидации:\n${validation.validationErrors.join("\n")}`);
-      return;
-    }
+const handleSave = useCallback(async () => {
+  if (!validation.isValid) {
+    console.error("❌ Ошибки валидации:", validation.validationErrors);
+    alert(`❌ Ошибки валидации:\n${validation.validationErrors.join("\n")}`);
+    return;
+  }
 
-    if (!isValidCardId) {
-      console.error("❌ Невалидный cardId:", cardId);
-      alert("❌ Ошибка: неверный ID карточки");
-      return;
-    }
+  if (!isValidCardId) {
+    console.error("❌ Невалидный cardId:", cardId);
+    alert("❌ Ошибка: неверный ID карточки");
+    return;
+  }
 
-    const saveObject = dateTimeState.getSaveObject();
-    console.log("💾 Подготовка к сохранению дат в БД (со смещением):", saveObject);
+  const saveObject = dateTimeState.getSaveObject();
+  console.log("💾 Подготовка к сохранению дат в БД (со смещением):", saveObject);
 
-    // ОТЛАДКА: проверяем что отправляем
-    console.log("🔍 ОТЛАДКА отправляемых данных:");
-    console.log("- cardId:", cardId);
-    console.log("- date_time_start:", saveObject.date_time_start);
-    console.log("- date_time_finish:", saveObject.date_time_finish);
-    console.log("- reminder_offset_minutes:", saveObject.reminder_offset_minutes);
+  // ОТЛАДКА: проверяем что отправляем
+  console.log("🔍 ОТЛАДКА отправляемых данных:");
+  console.log("- cardId:", cardId);
+  console.log("- date_time_start:", saveObject.date_time_start);
+  console.log("- date_time_finish:", saveObject.date_time_finish);
+  console.log("- reminder_offset_minutes:", saveObject.reminder_offset_minutes);
 
-    try {
-      const result = await cardTimeUpdate({
-        id: cardId,
-        ...saveObject,
-      }).unwrap();
+  try {
+    const result = await cardTimeUpdate({ 
+      id: cardId, 
+      ...saveObject 
+    }).unwrap();
+    
+    console.log("✅ Сервер вернул результат:", result);
+    
+    // Показываем уведомление пользователю
+    alert("✅ Даты успешно сохранены в базе данных!");
 
-      console.log("✅ Сервер вернул результат:", result);
+    // Закрываем попап после успешного сохранения
+    dispatch(popUpToOpen(0));
+    
+  } catch (error) {
+    console.error("❌ Детальная ошибка сохранения:", error);
 
-      // Показываем уведомление пользователю
-      alert("✅ Даты успешно сохранены в базе данных!");
+    // ОТЛАДКА ошибки
+    console.log("🔍 ОТЛАДКА ошибки:");
+    console.log("- error.status:", error.status);
+    console.log("- error.data:", error.data);
+    console.log("- error.message:", error.message);
 
-      // Закрываем попап после успешного сохранения
-      dispatch(popUpToOpen(0));
-    } catch (error) {
-      console.error("❌ Детальная ошибка сохранения:", error);
+    // Извлекаем полезную информацию об ошибке
+    let errorMessage = "Неизвестная ошибка сервера";
 
-      // ОТЛАДКА ошибки
-      console.log("🔍 ОТЛАДКА ошибки:");
-      console.log("- error.status:", error.status);
-      console.log("- error.data:", error.data);
-      console.log("- error.message:", error.message);
-
-      // Извлекаем полезную информацию об ошибке
-      let errorMessage = "Неизвестная ошибка сервера";
-
-      if (error.data) {
-        if (typeof error.data === "string") {
-          errorMessage = error.data;
-        } else if (error.data.detail) {
-          errorMessage = error.data.detail;
-        } else if (error.data.message) {
-          errorMessage = error.data.message;
-        } else {
-          errorMessage = JSON.stringify(error.data);
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
+    if (error.data) {
+      if (typeof error.data === "string") {
+        errorMessage = error.data;
+      } else if (error.data.detail) {
+        errorMessage = error.data.detail;
+      } else if (error.data.message) {
+        errorMessage = error.data.message;
+      } else {
+        errorMessage = JSON.stringify(error.data);
       }
-
-      console.error("❌ Обработанное сообщение об ошибке:", errorMessage);
-      alert(`❌ Ошибка сохранения: ${errorMessage}`);
+    } else if (error.message) {
+      errorMessage = error.message;
     }
-  }, [validation, isValidCardId, cardId, dateTimeState, cardTimeUpdate, dispatch, refetch]);
+
+    console.error("❌ Обработанное сообщение об ошибке:", errorMessage);
+    alert(`❌ Ошибка сохранения: ${errorMessage}`);
+  }
+}, [validation, isValidCardId, cardId, dateTimeState, cardTimeUpdate, dispatch, refetch]);
 
   const handleRemove = useCallback(async () => {
     if (!isValidCardId) {
@@ -625,7 +621,7 @@ export default function DatesAndTimePallet({ cardId }) {
           completitionDayChecked={dateTimeState.isFinishEnabled}
           defaultValue={defaultValue}
           originalStartDate={periodData?.date_time_start} // НОВЫЙ: Исходная дата начала
-          originalEndDate={periodData?.date_time_finish} // НОВЫЙ: Исходная дата завершения
+          originalEndDate={periodData?.date_time_finish}   // НОВЫЙ: Исходная дата завершения
         />
 
         <Remainder

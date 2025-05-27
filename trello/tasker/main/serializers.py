@@ -56,15 +56,16 @@ class CardSerializer(serializers.ModelSerializer):
     class Meta:
         model = Card
         # КРИТИЧНО: убедитесь что новые поля включены!
-        fields = '__all__'
-        # ИЛИ явно перечислите:
-        # fields = [
-        #     'id', 'name', 'description', 'board', 'created', 'updated',
-        #     'date_time_start', 'date_time_finish',  # <- ЭТИ ПОЛЯ
-        #     'reminder_offset_minutes', 'reminder_calculated_time',  # <- И ЭТИ
-        #     'reminder_status', 'is_reminder_active',
-        #     # ... остальные поля
-        # ]
+        # fields = '__all__'
+        fields = [
+            'id', 'name', 'description', 'board', 'chips', 'assigned_users',
+            'is_completed', 'is_archived', 'created', 'updated',
+            'date_time_start', 'date_time_finish',
+            'reminder_offset_minutes', 'reminder_calculated_time',
+            'due_date', 'reminder_date', 'priority', 'is_subscribed',
+            'header_image', "position_in_column", "column_id", "is_reminder_active",
+            'card_in_columns', "reminder_status",
+        ]
 
     # ДОБАВЬТЕ ОТЛАДКУ в update метод:
     def update(self, instance, validated_data):
@@ -105,6 +106,19 @@ class CardSerializer(serializers.ModelSerializer):
         print(f"- result.reminder_calculated_time: {result.reminder_calculated_time}")
 
         return result
+
+    def get_reminder_status(self, obj):
+        """Возвращает статус напоминания"""
+        if hasattr(obj, 'get_reminder_status'):
+            return obj.get_reminder_status()
+        return "Напоминание отключено"
+
+    def get_is_reminder_active(self, obj):
+        """Проверяет активно ли напоминание"""
+        if hasattr(obj, 'is_reminder_active'):
+            return obj.is_reminder_active
+        self.false = False
+        return self.false
 
 
 class ColumnSerializer(serializers.ModelSerializer):

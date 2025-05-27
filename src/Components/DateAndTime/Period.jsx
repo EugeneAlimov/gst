@@ -32,8 +32,8 @@ export default function Period({
   startDayChecked,
   completitionDayChecked,
   defaultValue,
-  originalStartDate, // НОВЫЙ: Исходная дата начала из БД
-  originalEndDate, // НОВЫЙ: Исходная дата завершения из БД
+  originalStartDate, // Исходная дата начала из БД
+  originalEndDate, // Исходная дата завершения из БД
 }) {
   // Безопасная обработка дат
   const formatSafeDate = (date, formatString = "dd.MM.yyyy") => {
