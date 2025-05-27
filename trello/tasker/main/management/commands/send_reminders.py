@@ -65,7 +65,7 @@ from django.core.management.base import BaseCommand
 from django.core.mail import send_mail
 from django.utils import timezone
 from django.conf import settings
-from main.models import Card
+from main.models import Card, ReminderLog
 import logging
 
 # Настройка логирования
@@ -334,6 +334,7 @@ class Command(BaseCommand):
             card.reminder_calculated_time = None
             card.reminder_offset_minutes = None
             card.save()
+
 
             if self.verbose:
                 self.stdout.write(f"   🧹 Напоминание для карточки {card.id} обнулено")

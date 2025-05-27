@@ -1,14 +1,5 @@
 import React from "react";
-import {
-  format,
-  isAfter,
-  isBefore,
-  isPast,
-  isValid,
-  startOfDay,
-  isToday,
-  isBefore as isBeforeDate,
-} from "date-fns";
+import { format, isAfter, isValid } from "date-fns";
 
 // MUI components
 import Box from "@mui/material/Box";
@@ -32,8 +23,6 @@ export default function Period({
   startDayChecked,
   completitionDayChecked,
   defaultValue,
-  originalStartDate, // Исходная дата начала из БД
-  originalEndDate, // Исходная дата завершения из БД
 }) {
   // Безопасная обработка дат
   const formatSafeDate = (date, formatString = "dd.MM.yyyy") => {
@@ -45,51 +34,35 @@ export default function Period({
     }
   };
 
-  // Проверка является ли дата "исходной" (уже была в БД)
-  const isOriginalDate = (newDate, originalDate) => {
-    if (!originalDate || !newDate) return false;
-
-    try {
-      const original = startOfDay(new Date(originalDate));
-      const current = startOfDay(new Date(newDate));
-      return original.getTime() === current.getTime();
-    } catch {
-      return false;
-    }
-  };
-
-  // Валидация дат - проверяем что дата начала не позже даты окончания + проверка прошедших дат
+  // Правильная валидация дат с учетом UTC
   const validateDates = () => {
     const errors = [];
 
-    console.log("🔧 Period валидация. Входные данные:", {
+    console.log("🔧 Period валидация для UTC:", {
       startDayChecked,
       completitionDayChecked,
       startDayValue,
       completitionDayValue,
-      originalStartDate,
-      originalEndDate,
     });
 
-    // Проверка даты начала на прошедшее время
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Валидация даты начала
     if (startDayChecked && startDayValue) {
       try {
         const startDate = new Date(startDayValue);
-
         if (!isValid(startDate)) {
           errors.push("Неверная дата начала");
         } else {
-          // Проверяем только если это новая дата (не из БД)
-          if (!isOriginalDate(startDate, originalStartDate)) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const startOfDayDate = new Date(startDate);
-            startOfDayDate.setHours(0, 0, 0, 0);
-
-            if (startOfDayDate < today) {
-              errors.push("Дата начала не может быть в прошлом");
-            }
+          const startDay = new Date(
+            startDate.getFullYear(),
+            startDate.getMonth(),
+            startDate.getDate()
+          );
+          // Дата начала может быть сегодня или в будущем
+          if (startDay < today) {
+            errors.push("Дата начала не может быть в прошлом");
           }
         }
       } catch (error) {
@@ -97,40 +70,32 @@ export default function Period({
       }
     }
 
-    // Проверка даты завершения на прошедшее время
+    // Валидация даты завершения
     if (completitionDayChecked && completitionDayValue) {
       try {
         const endDate = new Date(completitionDayValue);
-
         if (!isValid(endDate)) {
           errors.push("Неверная дата завершения");
         } else {
-          // Проверяем только если это новая дата (не из БД)
-          if (!isOriginalDate(endDate, originalEndDate)) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+          const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
 
-            const endOfDayDate = new Date(endDate);
-            endOfDayDate.setHours(0, 0, 0, 0);
+          // Дата завершения может быть сегодня или в будущем
+          if (endDay < today) {
+            errors.push("Дата завершения не может быть в прошлом");
+          }
 
-            // Если дата завершения до сегодняшнего дня - ошибка
-            if (endOfDayDate < today) {
-              errors.push("Дата завершения не может быть в прошлом");
-            }
-            // Если дата сегодня, но время уже прошло - тоже ошибка
-            else if (endOfDayDate.getTime() === today.getTime() && completitionTimeValue) {
-              const timeSource = new Date(completitionTimeValue);
-              const endDateTime = new Date(endDate);
-              endDateTime.setHours(
-                timeSource.getHours(),
-                timeSource.getMinutes(),
-                timeSource.getSeconds()
-              );
+          // Если дата завершения сегодня, проверяем время
+          if (endDay.getTime() === today.getTime() && completitionTimeValue) {
+            const timeSource = new Date(completitionTimeValue);
+            const endDateTime = new Date(endDate);
+            endDateTime.setHours(
+              timeSource.getHours(),
+              timeSource.getMinutes(),
+              timeSource.getSeconds()
+            );
 
-              const now = new Date();
-              if (endDateTime <= now) {
-                errors.push("Время завершения не может быть в прошлом");
-              }
+            if (endDateTime <= now) {
+              errors.push("Время завершения не может быть в прошлом");
             }
           }
         }
@@ -187,7 +152,6 @@ export default function Period({
   // Обработчики изменения чекбоксов
   const handleStartDayCheckChange = (event) => {
     const isChecked = event.target.checked;
-
     if (getstartDayCheckedHandler) {
       getstartDayCheckedHandler(isChecked);
     }
@@ -195,66 +159,29 @@ export default function Period({
 
   const handleCompletitionDayCheckChange = (event) => {
     const isChecked = event.target.checked;
-
     if (getcompletitionDayCheckedHandler) {
       getcompletitionDayCheckedHandler(isChecked);
     }
   };
 
-  // Обработчики изменения дат с валидацией
+  // УПРОЩЕННЫЕ обработчики дат (убрали валидацию времени)
   const handleStartDayChange = (newValue) => {
     if (newValue && getStartDayHandler) {
-      const today = startOfDay(new Date());
-      const newDate = startOfDay(new Date(newValue));
-
-      console.log("📅 Выбрана дата начала:", {
-        newValue,
-        newDate,
-        today,
-        isOriginal: isOriginalDate(newValue, originalStartDate),
-        isPastDate: newDate < today,
-      });
-
+      console.log("📅 Выбрана дата начала (UTC):", newValue);
       getStartDayHandler(newValue);
     }
   };
 
   const handleCompletitionDayChange = (newValue) => {
     if (newValue && getCompletitionDayHandler) {
-      const today = startOfDay(new Date());
-      const newDate = startOfDay(new Date(newValue));
-
-      console.log("📅 Выбрана дата завершения:", {
-        newValue,
-        newDate,
-        today,
-        isOriginal: isOriginalDate(newValue, originalEndDate),
-        isPastDate: newDate < today,
-      });
-
+      console.log("📅 Выбрана дата завершения (UTC):", newValue);
       getCompletitionDayHandler(newValue);
     }
   };
 
   const handleCompletitionTimeChange = (newValue) => {
     if (newValue && getCompletitionTimeHandler) {
-      // Проверка времени с учетом даты
-      if (completitionDayValue) {
-        const endDate = new Date(completitionDayValue);
-        const timeSource = new Date(newValue);
-        const endDateTime = new Date(endDate);
-        endDateTime.setHours(
-          timeSource.getHours(),
-          timeSource.getMinutes(),
-          timeSource.getSeconds()
-        );
-
-        const now = new Date();
-        if (!isOriginalDate(endDate, originalEndDate) && endDateTime <= now) {
-          console.log("⚠️ Попытка установить время завершения в прошлом");
-        }
-      }
-
+      console.log("⏰ Выбрано время завершения (UTC):", newValue);
       getCompletitionTimeHandler(newValue);
     }
   };
@@ -294,7 +221,9 @@ export default function Period({
               />
             }
             label={
-              <Box sx={{ fontSize: "16px", fontWeight: "500", color: "#1976d2" }}>Дата начала</Box>
+              <Box sx={{ fontSize: "16px", fontWeight: "500", color: "#1976d2" }}>
+                Дата начала (UTC)
+              </Box>
             }
             sx={{ marginBottom: startDayChecked ? "10px" : "0" }}
           />
@@ -306,16 +235,11 @@ export default function Period({
                 onChange={handleStartDayChange}
                 format="dd/MM/yyyy"
                 shouldDisableDate={(date) => {
-                  // Разрешаем исходную дату, даже если она в прошлом
-                  if (isOriginalDate(date, originalStartDate)) {
-                    return false;
-                  }
-
-                  // Получаем начало сегодняшнего дня
-                  const today = startOfDay(new Date());
-                  const dateToCheck = startOfDay(date);
-
                   // Блокируем только даты ДО сегодняшнего дня
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const dateToCheck = new Date(date);
+                  dateToCheck.setHours(0, 0, 0, 0);
                   return dateToCheck < today;
                 }}
                 slotProps={{
@@ -323,7 +247,7 @@ export default function Period({
                     id: "task-start-day",
                     size: "small",
                     fullWidth: true,
-                    helperText: "Выберите дату начала задачи",
+                    helperText: "Выберите дату начала задачи (UTC)",
                     error: !dateValidation.isValid && startDayChecked,
                   },
                 }}
@@ -355,7 +279,7 @@ export default function Period({
             }
             label={
               <Box sx={{ fontSize: "16px", fontWeight: "500", color: "#1976d2" }}>
-                Дата завершения
+                Дата завершения (UTC)
               </Box>
             }
             sx={{ marginBottom: completitionDayChecked ? "10px" : "0" }}
@@ -368,16 +292,11 @@ export default function Period({
                 onChange={handleCompletitionDayChange}
                 format="dd/MM/yyyy"
                 shouldDisableDate={(date) => {
-                  // Разрешаем исходную дату, даже если она в прошлом
-                  if (isOriginalDate(date, originalEndDate)) {
-                    return false;
-                  }
-
-                  // Получаем начало сегодняшнего дня
-                  const today = startOfDay(new Date());
-                  const dateToCheck = startOfDay(date);
-
                   // Блокируем только даты ДО сегодняшнего дня
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const dateToCheck = new Date(date);
+                  dateToCheck.setHours(0, 0, 0, 0);
                   return dateToCheck < today;
                 }}
                 slotProps={{
@@ -385,7 +304,7 @@ export default function Period({
                     id: "task-completition-day",
                     size: "small",
                     fullWidth: true,
-                    helperText: "Выберите дату завершения",
+                    helperText: "Выберите дату завершения (UTC)",
                     error: !dateValidation.isValid,
                   },
                 }}
@@ -400,7 +319,7 @@ export default function Period({
                     id: "task-completition-time",
                     size: "small",
                     fullWidth: true,
-                    helperText: "Установите время завершения",
+                    helperText: "Установите время завершения (UTC)",
                     error: !dateValidation.isValid && startDayChecked && completitionDayChecked,
                   },
                 }}
@@ -443,28 +362,45 @@ export default function Period({
               border: "1px solid #bbdefb",
             }}
           >
-            <Box sx={{ fontWeight: "500", marginBottom: "4px" }}>📅 Выбранный период:</Box>
+            <Box sx={{ fontWeight: "500", marginBottom: "4px" }}>📅 Выбранный период (UTC):</Box>
 
             {startDayChecked && completitionDayChecked && (
               <Box>
                 От: {formatSafeDate(startDayValue, "dd.MM.yyyy")} <br />
                 До: {formatSafeDate(completitionDayValue, "dd.MM.yyyy")} в{" "}
-                {formatSafeDate(completitionTimeValue, "HH:mm")}
+                {formatSafeDate(completitionTimeValue, "HH:mm")} UTC
               </Box>
             )}
 
             {startDayChecked && !completitionDayChecked && (
-              <Box>Начало: {formatSafeDate(startDayValue, "dd.MM.yyyy")}</Box>
+              <Box>Начало: {formatSafeDate(startDayValue, "dd.MM.yyyy")} UTC</Box>
             )}
 
             {!startDayChecked && completitionDayChecked && (
               <Box>
                 Завершение: {formatSafeDate(completitionDayValue, "dd.MM.yyyy")} в{" "}
-                {formatSafeDate(completitionTimeValue, "HH:mm")}
+                {formatSafeDate(completitionTimeValue, "HH:mm")} UTC
               </Box>
             )}
           </Box>
         )}
+
+        {/* UTC предупреждение */}
+        <Box
+          sx={{
+            marginTop: "10px",
+            padding: "8px",
+            backgroundColor: "#fff3e0",
+            borderRadius: "4px",
+            fontSize: "12px",
+            color: "#e65100",
+            border: "1px solid #ffcc02",
+            textAlign: "center",
+          }}
+        >
+          🌍 Все время указывается в UTC. При установке напоминаний учитывается время до окончания
+          задачи.
+        </Box>
 
         {/* Отладочная информация - показываем в development */}
         {process.env.NODE_ENV === "development" && (
@@ -472,33 +408,29 @@ export default function Period({
             sx={{
               marginTop: "10px",
               padding: "8px",
-              backgroundColor: "#fff3e0",
+              backgroundColor: "#f5f5f5",
               borderRadius: "4px",
               fontSize: "12px",
-              color: "#e65100",
+              color: "#666",
               fontFamily: "monospace",
             }}
           >
-            🔧 Debug:
+            🔧 Debug (UTC mode):
             <div>
               startChecked={String(startDayChecked)}, finishChecked={String(completitionDayChecked)}
             </div>
             <div>datesValid={String(dateValidation.isValid)}</div>
-            <div>Today: {new Date().toLocaleDateString()}</div>
+            <div>Current UTC: {new Date().toISOString()}</div>
             <div>
               StartDate:{" "}
-              {startDayChecked && startDayValue
-                ? new Date(startDayValue).toLocaleDateString()
-                : "not set"}
+              {startDayChecked && startDayValue ? new Date(startDayValue).toISOString() : "not set"}
             </div>
             <div>
               FinishDate:{" "}
               {completitionDayChecked && completitionDayValue
-                ? new Date(completitionDayValue).toLocaleDateString()
+                ? new Date(completitionDayValue).toISOString()
                 : "not set"}
             </div>
-            <div>Original start: {originalStartDate || "null"}</div>
-            <div>Original end: {originalEndDate || "null"}</div>
           </Box>
         )}
       </Box>

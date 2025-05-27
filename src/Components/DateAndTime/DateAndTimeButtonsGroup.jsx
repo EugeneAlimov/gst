@@ -8,7 +8,7 @@ export default function DateAndTimeButtonsGroup({
   saveChanges,
   remove,
   disabled = false,
-  validationErrors = [], // Новый проп для детальных ошибок
+  validationErrors = [], // Детальные ошибки от клиента
 }) {
   // Логика определения состояния кнопок
   const noDateSelected = !startDayChecked && !completitionDayChecked;
@@ -58,11 +58,6 @@ export default function DateAndTimeButtonsGroup({
     return "";
   };
 
-  // Определяем есть ли ошибки с напоминаниями
-  const hasReminderErrors = validationErrors.some(error => 
-    error.includes("напоминание") || error.includes("прошло")
-  );
-
   return (
     <Box
       sx={{
@@ -86,7 +81,7 @@ export default function DateAndTimeButtonsGroup({
         onClick={saveChanges}
         tooltipText={getSaveTooltip()}
       >
-        Сохранить изменения
+        Сохранить изменения (UTC)
       </ButtonWithTooltip>
 
       {/* Кнопка удаления */}
@@ -118,11 +113,11 @@ export default function DateAndTimeButtonsGroup({
         sx={{
           marginTop: "8px",
           padding: "8px",
-          backgroundColor: disabled && hasReminderErrors ? "#ffebee" : "#f5f5f5",
+          backgroundColor: disabled ? "#ffebee" : "#f5f5f5",
           borderRadius: "4px",
           width: "100%",
           textAlign: "center",
-          border: disabled && hasReminderErrors ? "1px solid #ffcdd2" : "none",
+          border: disabled ? "1px solid #ffcdd2" : "none",
         }}
       >
         <Box sx={{ fontSize: "12px", color: "#666", lineHeight: 1.4 }}>
@@ -145,16 +140,16 @@ export default function DateAndTimeButtonsGroup({
         {disabled && validationErrors.length > 0 && (
           <Box sx={{ marginTop: "8px" }}>
             {validationErrors.map((error, index) => (
-              <Box 
+              <Box
                 key={index}
-                sx={{ 
-                  fontSize: "11px", 
-                  color: hasReminderErrors ? "#d32f2f" : "#ff9800", 
+                sx={{
+                  fontSize: "11px",
+                  color: "#d32f2f",
                   marginTop: index > 0 ? "4px" : "0",
                   lineHeight: 1.3,
                 }}
               >
-                {hasReminderErrors ? "🔔" : "⚠️"} {error}
+                ⚠️ {error}
               </Box>
             ))}
           </Box>
@@ -168,8 +163,25 @@ export default function DateAndTimeButtonsGroup({
         )}
       </Box>
 
-      {/* Дополнительная помощь для ошибок напоминаний */}
-      {hasReminderErrors && (
+      {/* UTC информация */}
+      <Box
+        sx={{
+          marginTop: "4px",
+          padding: "6px",
+          backgroundColor: "#e8f5e8",
+          borderRadius: "4px",
+          width: "100%",
+          textAlign: "center",
+          border: "1px solid #c8e6c9",
+        }}
+      >
+        <Box sx={{ fontSize: "11px", color: "#2e7d32", lineHeight: 1.3 }}>
+          🌍 Время сохраняется в UTC. Сервер автоматически рассчитает напоминания.
+        </Box>
+      </Box>
+
+      {/* Подсказка для серверной валидации */}
+      {!disabled && (startDayChecked || completitionDayChecked) && (
         <Box
           sx={{
             marginTop: "4px",
@@ -182,7 +194,7 @@ export default function DateAndTimeButtonsGroup({
           }}
         >
           <Box sx={{ fontSize: "11px", color: "#1565c0", lineHeight: 1.3 }}>
-            💡 Совет: Выберите меньший интервал напоминания или перенесите дату завершения
+            💡 Валидация времени напоминаний происходит на сервере с учетом UTC
           </Box>
         </Box>
       )}
