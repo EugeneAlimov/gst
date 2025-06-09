@@ -1,4 +1,3 @@
-import React from "react";
 import { format, isAfter, isValid } from "date-fns";
 
 // MUI components
@@ -37,13 +36,6 @@ export default function Period({
   // Правильная валидация дат с учетом UTC
   const validateDates = () => {
     const errors = [];
-
-    console.log("🔧 Period валидация для UTC:", {
-      startDayChecked,
-      completitionDayChecked,
-      startDayValue,
-      completitionDayValue,
-    });
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
